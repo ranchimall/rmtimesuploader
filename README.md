@@ -7,100 +7,50 @@ Submit your article in docx format using this single page html for publishing in
 
 ```markdown
 
-# RM Times - Direct Content Publisher
-
-
-
-A lightweight, zero-backend browser application for converting `.docx` documents and publishing articles directly to the **RanchiMall Times (RM Times)** decentralized cloud publishing network.
-
-
-
 ---
-
-
-
-## 🌟 Key Features
-
-
-
-- 📄 **In-Browser `.docx` Converter**: Unzips and parses Microsoft Word (`.docx`) files entirely client-side using `JSZip` and native `DOMParser` APIs.
-
-- 🖼️ **Automated GitHub Image Hosting**: Automatically extracts embedded images from `.docx` files and uploads them via the GitHub REST API to `ranchimall/rmtimes` (`imageinsidearticle` branch) for hosting.
-
-- 📊 **Rich Element Preservation**: Preserves article headings, paragraph formatting, tables with mobile-responsive wrapper styling, and image alignment.
-
-- 👁️ **Local Preview & Export**: Inspect converted articles before publishing with one-click **Download JSON** and **Download Preview HTML**.
-
-- 🔑 **Cryptographic Signing (WIF)**: Authenticates article submissions on the FLO Blockchain network using client-derived FLO IDs (`floCrypto.js`).
-
-- 👥 **Multi-Contributor Attestation**: Support for adding multiple contributor FLO IDs to credit co-authors.
-
-- ⚡ **Decentralized SuperNode Cloud Dispatch**: Submits article payloads to RanchiMall SuperNode cloud storage via `floCloudAPI`.
-
-
-
----
-
-
 
 ## 🏗️ Architecture & Cloud Integration
 
-
-
-The application operates completely client-side in the web browser, integrating three primary services:
-
-
+The RM Times Content Publisher is a fully client-side application. It processes `.docx` files in the browser, uploads embedded images to GitHub, cryptographically signs article metadata, and submits publishing requests to the RanchiMall decentralized cloud.
 
 ```mermaid
+flowchart LR
 
-flowchart TD
+    A["Author<br/>.docx File"]
+        --> B["Browser App<br/>Parse • Convert • Preview"]
 
-    A[Author's .docx File] --> B[RM Times Content Creator App]
+    B -->|Images| C["GitHub Repository<br/>Image Hosting"]
 
-    
+    B -->|Signed Payload| D["floCloudAPI<br/>Publishing Request"]
 
-    subgraph Browser Client
+    D --> E["Admin Review"]
 
-        B --> C[JSZip & XML Parser]
+    E --> F["Live RM Times Website"]
+```
 
-        C --> D[Extract Text, Tables & Images]
+### Publishing Workflow
 
-        D --> E[Local HTML & JSON Preview]
+| Stage | Component | Purpose |
+|-------|-----------|---------|
+| **1** | **Browser Client** | Reads the `.docx` file locally using **JSZip** and **DOMParser**. No server-side processing occurs. |
+| **2** | **Content Extraction** | Extracts headings, paragraphs, tables, formatting, and embedded images while preserving document structure. |
+| **3** | **GitHub Image Hosting** | Uploads extracted images to the `ranchimall/rmtimes` repository and replaces local references with hosted image URLs. |
+| **4** | **Cryptographic Authentication** | Uses `floCrypto.js` to derive the author's FLO identity from their WIF key and digitally authenticate the submission. |
+| **5** | **Decentralized Submission** | Sends the authenticated publishing request to RanchiMall SuperNodes via `floCloudAPI.sendGeneralData()`. |
+| **6** | **Editorial Approval** | RM Times administrators review the submitted article before publication. |
+| **7** | **Publication** | Once approved, the article becomes available on the live RM Times website. |
 
-        B --> F[floCrypto WIF Key Derivation]
+### Integrated Technologies
 
-    end
+| Technology | Role |
+|------------|------|
+| **JSZip** | Reads and extracts `.docx` archives entirely in the browser. |
+| **DOMParser** | Parses Word XML into HTML content. |
+| **GitHub REST API** | Hosts embedded images. |
+| **floCrypto.js** | Generates FLO identity and signs submissions. |
+| **floCloudAPI** | Stores authenticated publishing requests on RanchiMall SuperNodes. |
 
-
-
-    subgraph GitHub API
-
-        D -- Images Base64 --> G[GitHub Repo: ranchimall/rmtimes]
-
-        G -- Hosted Image URLs --> H[raw.githubusercontent.com]
-
-    end
-
-
-
-    subgraph RanchiMall Cloud SuperNodes
-
-        F -- Authenticated Payload --> I[floCloudAPI.sendGeneralData]
-
-        I --> J[SuperNode Storage: publishing_requests]
-
-    end
-
-
-
-    subgraph Approval & Live Site
-
-        J --> K[RM Times Admin/Subadmin Review]
-
-        K -- Approve & Sign --> L[Live RM Times Website]
-
-    end
-
+---
 ```
 
 
