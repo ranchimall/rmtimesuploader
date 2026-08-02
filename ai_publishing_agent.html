@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RM Times - Direct Content Publisher</title>
+    
+    <!-- floGlobals MUST be defined before floCloudAPI.js loads, since floCloudAPI.js
+         reads floGlobals.* synchronously at parse-time (top-level DEFAULT object). -->
+    <script>
+        const globalScope = typeof window !== 'undefined' ? window : global;
+
+        globalScope.floGlobals = globalScope.floGlobals || {};
+
+        floGlobals.SNStorageID = floGlobals.SNStorageID || "FNaN9McoBAEFUjkRmNQRYLmBF8SpS7Tgfk";
+        floGlobals.adminID = floGlobals.adminID || "FNaN9McoBAEFUjkRmNQRYLmBF8SpS7Tgfk";
+        floGlobals.application = floGlobals.application || "RM_Times";
+        floGlobals.subAdmins = floGlobals.subAdmins || [];
+        floGlobals.settings = floGlobals.settings || {};
+    </script>
+
+    <!-- External Dependencies: DOMPurify, JSZip, lib, floCrypto, & floCloudAPI -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://ranchimall.github.io/cc/scripts/lib.js"></script>
+    <script src="https://ranchimall.github.io/cc/scripts/floCrypto.js"></script>
+    <script src="https://ranchimall.github.io/cc/scripts/floCloudAPI.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #4d2588;
+            --primary-hover: #3b196c;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #212529;
+            --border-color: #e9ecef;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            width: 100%;
+            padding: 32px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+        }
+
+        p {
+            font-size: 0.95rem;
+            color: #6c757d;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .btn-publish {
+            background-color: var(--primary-color);
+            color: #ffffff;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+
+        .btn-publish:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-publish:active {
+            transform: scale(0.98);
+        }
+
+        .file-picker-wrap {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .file-picker-label {
+            display: inline-block;
+            background-color: #ffffff;
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .file-picker-label:hover {
+            background-color: #f3effa;
+        }
+
+        #articleFileInput {
+            display: none;
+        }
+
+        .file-picker-status {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        .file-picker-status.loaded {
+            color: #1e7e34;
+            font-weight: 600;
+        }
+
+        .file-picker-status.error {
+            color: #c0392b;
+            font-weight: 600;
+        }
+
+        .download-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn-secondary {
+            background-color: #ffffff;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--bg-color);
+        }
+
+        #logOutput {
+            margin-top: 24px;
+            text-align: left;
+            background: #1e1e1e;
+            color: #4af626;
+            padding: 16px;
+            border-radius: var(--radius);
+            font-family: "Courier New", Courier, monospace;
+            font-size: 0.85rem;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>RM Times Content Creator</h1>
+        <p>Select the article <code>.docx</code> file, then click below to enter your private key and publish directly to RanchiMall Times.</p>
+
+        <div class="file-picker-wrap">
+            <label for="articleFileInput" class="file-picker-label">Choose Article .docx File</label>
+            <input type="file" id="articleFileInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+            <div id="filePickerStatus" class="file-picker-status">No file selected</div>
+            <div id="downloadActions" class="download-actions" style="display:none;">
+                <button type="button" class="btn-secondary" id="downloadJsonBtn">Download JSON</button>
+                <button type="button" class="btn-secondary" id="downloadPreviewBtn">Download Preview HTML</button>
+            </div>
+        </div>
+
+        <button class="btn-publish" onclick="publishDirectUserContent()">
+            Start Direct Creator & Publish
+        </button>
+
+        <div id="logOutput"></div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // 1. SUPERNODE CONFIGURATION
+        // (floGlobals is already initialized in the <head>, before floCloudAPI.js loads)
+        // =========================================================================
+        // =========================================================================
+        const supernodesList = {
+            "FQUepiEXu4zhEtENqLA8RXdidXYiCUPeuc": {
+                uri: "ranchimallcloud1.duckdns.org",
+                pubKey: "03A0AD65FFBB8CAE0316BC93EE2BD6BDDF3A47970C2D550E4E1C7DFC559F131EA2"
+            },
+            "FBjW246c4VT9KC4p5CLsEjd7gMGcaFWBov": {
+                uri: "ranchimallcloud0.duckdns.org",
+                pubKey: "03DABC832B95F088CA88F87D154B73B415F085945CFF3D4C36DCE081518D229B31"
+            }
+        };
+
+        // =========================================================================
+        // 3. UTILITY HELPERS
+        // =========================================================================
+        function calculateReadTime(text) {
+            const wordsPerMinute = 200;
+            const words = text ? text.trim().split(/\s+/).length : 0;
+            return Math.ceil(words / wordsPerMinute);
+        }
+
+        function parseContributors(rawInput, myFloID) {
+            // Always include the publisher; then add any extra contributors the user entered.
+            const contributors = [myFloID];
+
+            if (rawInput && rawInput.trim() !== "") {
+                const entries = rawInput.split(",").map(s => s.trim()).filter(s => s !== "");
+                const alphanumericPattern = /^[a-zA-Z0-9]+$/;
+
+                for (const entry of entries) {
+                    if (!alphanumericPattern.test(entry)) {
+                        alert(`"${entry}" is not valid — contributors must be alphanumeric only. It will be skipped.`);
+                        continue;
+                    }
+                    if (!contributors.includes(entry)) {
+                        contributors.push(entry);
+                    }
+                }
+            }
+
+            return contributors;
+        }
+
+        function logToScreen(message) {
+            const logElement = document.getElementById("logOutput");
+            logElement.style.display = "block";
+            logElement.textContent += message + "\n";
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        // =========================================================================
+        // 3b. IN-BROWSER DOCX -> ARTICLE CONVERTER
+        // Ports docx_to_article.py's logic to run entirely client-side: a .docx
+        // is a ZIP of XML files, so JSZip unzips it and DOMParser walks the XML
+        // to reproduce the same heading-tier detection, title extraction, image
+        // extraction/sizing, and table rendering as the Python script.
+        // =========================================================================
+        const OOXML_NS = {
+            w:   "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            r:   "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            a:   "http://schemas.openxmlformats.org/drawingml/2006/main",
+            wp:  "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+            rel: "http://schemas.openxmlformats.org/package/2006/relationships",
+            dc:  "http://purl.org/dc/elements/1.1/"
+        };
+
+        // --- GitHub upload defaults (mirrors docx_to_article.py's constants) ---
+        const GITHUB_OWNER = "ranchimall";
+        const GITHUB_REPO = "rmtimes";
+        const GITHUB_BRANCH = "imageinsidearticle";
+        const GITHUB_REPO_IMAGE_PATH = "images";
+        const GITHUB_IMAGE_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${GITHUB_REPO_IMAGE_PATH}/`;
+        const DEFAULT_IMAGE_WIDTH = 800;
+
+        const HEURISTIC_MAX_WORDS = 12;
+        const SENTENCE_ENDINGS = [".", "!", "?", ":", ";", ","];
+        const NUMBERED_HEADING_MIN_MATCHES = 2;
+        const NUMBERED_HEADING_RE = /^\d+(\.\d+)*\.?\s+\S/;
+
+        const TABLE_STYLE_BLOCK = `<style>
+        .rmtimes-table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .rmtimes-table-wrap table {
+            width: max-content;
+            min-width: 100%;
+            table-layout: auto;
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+        }
+        .rmtimes-table-wrap th,
+        .rmtimes-table-wrap td {
+            white-space: normal;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        .rmtimes-table-wrap th {
+            background-color: #222;
+            color: white;
+            text-align: left;
+            padding: 10px;
+        }
+        .rmtimes-table-wrap td {
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+            vertical-align: top;
+        }
+        .rmtimes-table-wrap tr:nth-child(even) {
+            background-color: #f5f5f5;
+        }
+        @media (max-width: 480px) {
+            .rmtimes-table-wrap th,
+            .rmtimes-table-wrap td {
+                padding: 6px 8px;
+                font-size: 0.85rem;
+            }
+        }
+    </style>`;
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function directChildren(el, ns, local) {
+            return Array.from(el.children).filter(c => c.namespaceURI === ns && c.localName === local);
+        }
+
+        function parseXml(xmlString, label) {
+            const doc = new DOMParser().parseFromString(xmlString, "application/xml");
+            const err = doc.getElementsByTagName("parsererror")[0];
+            if (err) throw new Error(`Failed to parse ${label}: ${err.textContent.slice(0, 200)}`);
+            return doc;
+        }
+
+        function getParagraphText(pEl) {
+            let text = "";
+            (function walk(node) {
+                for (const child of node.childNodes) {
+                    if (child.nodeType !== 1) continue;
+                    const local = child.localName;
+                    if (child.namespaceURI === OOXML_NS.w && local === "t") {
+                        text += child.textContent;
+                    } else if (child.namespaceURI === OOXML_NS.w && local === "tab") {
+                        text += "\t";
+                    } else if (child.namespaceURI === OOXML_NS.w && (local === "br" || local === "cr")) {
+                        text += " ";
+                    } else {
+                        walk(child);
+                    }
+                }
+            })(pEl);
+            return text;
+        }
+
+        function looksLikeNumberedHeading(text) {
+            return NUMBERED_HEADING_RE.test(text.trim());
+        }
+
+        function looksLikeHeadingText(text) {
+            const words = text.split(/\s+/).filter(Boolean);
+            if (!words.length || words.length > HEURISTIC_MAX_WORDS) return false;
+            const trimmed = text.trim();
+            return !SENTENCE_ENDINGS.includes(trimmed.slice(-1));
+        }
+
+        function findExtent(blipEl) {
+            let node = blipEl.parentElement;
+            while (node) {
+                const extent = directChildren(node, OOXML_NS.wp, "extent")[0];
+                if (extent) return extent;
+                node = node.parentElement;
+            }
+            return null;
+        }
+
+        function bytesToBase64(bytes) {
+            let binary = "";
+            const chunkSize = 0x8000;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+            }
+            return btoa(binary);
+        }
+
+        function renderTableBlock(tblEl) {
+            const rows = directChildren(tblEl, OOXML_NS.w, "tr");
+            const rowsHtml = rows.map((row, i) => {
+                const tag = i === 0 ? "th" : "td";
+                const cells = directChildren(row, OOXML_NS.w, "tc");
+                const cellsHtml = cells.map(cell => {
+                    const paras = directChildren(cell, OOXML_NS.w, "p");
+                    const parts = paras
+                        .map(p => getParagraphText(p).trim())
+                        .filter(Boolean)
+                        .map(escapeHtml);
+                    return `<${tag}>${parts.join("<br>")}</${tag}>`;
+                }).join("\n        ");
+                return `    <tr>\n        ${cellsHtml}\n    </tr>`;
+            });
+            const tableHtml = `<div class="rmtimes-table-wrap">\n<table>\n${rowsHtml.join("\n")}\n</table>\n</div>`;
+            return TABLE_STYLE_BLOCK + "\n" + tableHtml;
+        }
+
+        function renderContentHtml(sections) {
+            // Exception: the preamble section (title === null, i.e. text between
+            // the article title and the first <h3>) has consecutive plain-text
+            // blocks merged into one <p> line instead of one <p> per paragraph,
+            // to avoid stacked-paragraph gaps in front matter (subtitle,
+            // byline, keyword line, etc.). Images/tables still get their own
+            // <p> and break up the text-merging run.
+            const blocksOut = [];
+            for (const section of sections) {
+                const lines = [];
+                if (section.title !== null) {
+                    lines.push(`<h3>${escapeHtml(section.title)}</h3>`);
+                    for (const block of section.blocks) {
+                        if (block.kind === "text") lines.push(`<p>${escapeHtml(block.content)}</p>`);
+                        else lines.push(`<p>${block.content}</p>`);
+                    }
+                } else {
+                    let textRun = [];
+                    const flushTextRun = () => {
+                        if (textRun.length) {
+                            const joined = textRun.join(" ").trim();
+                            if (joined) lines.push(`<p>${escapeHtml(joined)}</p>`);
+                            textRun = [];
+                        }
+                    };
+                    for (const block of section.blocks) {
+                        if (block.kind === "text") {
+                            textRun.push(block.content);
+                        } else {
+                            flushTextRun();
+                            lines.push(`<p>${block.content}</p>`);
+                        }
+                    }
+                    flushTextRun();
+                }
+                if (lines.length) blocksOut.push(lines.join("\n"));
+            }
+            return blocksOut.join("\n\n").trim();
+        }
+
+        function normalizeForCompare(text) {
+            return text.trim().replace(/\s+/g, " ").toLowerCase();
+        }
+
+        // Parses a .docx File object into {title, content, readTime, extractedImages}
+        // extractedImages: [{filename, bytes: Uint8Array}] -- still need uploading to GitHub.
+        async function convertDocxFile(file) {
+            const zip = await JSZip.loadAsync(file);
+
+            const docEntry = zip.file("word/document.xml");
+            if (!docEntry) throw new Error("Not a valid .docx: word/document.xml not found.");
+            const docXml = parseXml(await docEntry.async("string"), "word/document.xml");
+
+            const relsEntry = zip.file("word/_rels/document.xml.rels");
+            const relsXml = parseXml(
+                relsEntry ? await relsEntry.async("string") : '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+                "document.xml.rels"
+            );
+
+            const stylesEntry = zip.file("word/styles.xml");
+            const stylesXml = parseXml(
+                stylesEntry ? await stylesEntry.async("string") : `<w:styles xmlns:w="${OOXML_NS.w}"/>`,
+                "styles.xml"
+            );
+
+            const coreEntry = zip.file("docProps/core.xml");
+            const coreXml = coreEntry ? parseXml(await coreEntry.async("string"), "core.xml") : null;
+
+            // styleId -> lowercase display name (e.g. "Heading1" -> "heading 1")
+            const styleMap = {};
+            for (const styleEl of Array.from(stylesXml.getElementsByTagNameNS(OOXML_NS.w, "style"))) {
+                if (styleEl.getAttributeNS(OOXML_NS.w, "type") !== "paragraph") continue;
+                const id = styleEl.getAttributeNS(OOXML_NS.w, "styleId");
+                const nameEl = directChildren(styleEl, OOXML_NS.w, "name")[0];
+                const nameVal = nameEl ? (nameEl.getAttributeNS(OOXML_NS.w, "val") || "").toLowerCase() : "";
+                if (id) styleMap[id] = nameVal;
+            }
+
+            function getParaStyleName(p) {
+                const pPr = directChildren(p, OOXML_NS.w, "pPr")[0];
+                if (!pPr) return "";
+                const pStyle = directChildren(pPr, OOXML_NS.w, "pStyle")[0];
+                if (!pStyle) return "";
+                const id = pStyle.getAttributeNS(OOXML_NS.w, "val");
+                return styleMap[id] || "";
+            }
+            const hasHeadingStyle = p => getParaStyleName(p).startsWith("heading");
+            const isTitleStyle = p => getParaStyleName(p) === "title";
+            const isHeading = p => hasHeadingStyle(p) || isTitleStyle(p);
+
+            // relationship Id -> Target (e.g. "media/image1.png")
+            const relsMap = {};
+            for (const relEl of Array.from(relsXml.getElementsByTagNameNS(OOXML_NS.rel, "Relationship"))) {
+                relsMap[relEl.getAttribute("Id")] = relEl.getAttribute("Target");
+            }
+
+            let coreTitle = "";
+            if (coreXml) {
+                const titleEls = coreXml.getElementsByTagNameNS(OOXML_NS.dc, "title");
+                if (titleEls.length) coreTitle = (titleEls[0].textContent || "").trim();
+            }
+
+            const body = docXml.getElementsByTagNameNS(OOXML_NS.w, "body")[0];
+            if (!body) throw new Error("Not a valid .docx: <w:body> not found.");
+            const bodyParagraphs = directChildren(body, OOXML_NS.w, "p");
+
+            // --- Heading-tier detection (style > numbered > heuristic) ---
+            const hasRealHeadings = bodyParagraphs.some(p => getParagraphText(p).trim() && hasHeadingStyle(p));
+            let headingMode;
+            if (hasRealHeadings) {
+                headingMode = "style";
+            } else {
+                const numberedCount = bodyParagraphs.filter(p => {
+                    const t = getParagraphText(p).trim();
+                    return t && looksLikeNumberedHeading(t);
+                }).length;
+                headingMode = numberedCount >= NUMBERED_HEADING_MIN_MATCHES ? "numbered" : "heuristic";
+            }
+
+            // --- Title extraction ---
+            const docxStem = file.name.replace(/\.docx$/i, "");
+            let title = null;
+            for (const p of bodyParagraphs) {
+                const t = getParagraphText(p).trim();
+                if (t && isTitleStyle(p)) { title = t; break; }
+            }
+            if (!title) title = coreTitle || docxStem;
+
+            // --- Walk the body building sections/blocks, in document order ---
+            const sections = [];
+            let current = null;
+            let imageCounter = 0;
+            const extractedImages = [];
+
+            // Running word-prefix match against the title: catches a repeat
+            // of the title text in the preamble even when it's split across
+            // more than one paragraph (e.g. a "kicker" line in a different
+            // case right below the real Title-styled paragraph). The cursor
+            // resets to 0 once a full repeat is consumed, so a second,
+            // separate repeat is also caught; it closes for good the first
+            // time a paragraph doesn't continue the match.
+            const titleWords = normalizeForCompare(title).split(" ").filter(Boolean);
+            let titleWordsConsumed = 0;
+            let titleRepeatOpen = titleWords.length > 0;
+
+            function ensureCurrent() {
+                if (!current) { current = { title: null, blocks: [] }; sections.push(current); }
+                return current;
+            }
+
+            for (const child of Array.from(body.children)) {
+                if (child.namespaceURI === OOXML_NS.w && child.localName === "p") {
+                    const p = child;
+                    const text = getParagraphText(p).trim();
+
+                    // Alt text: first non-empty docPr descr anywhere in this paragraph
+                    // (matches docx_to_article.py's paragraph-wide scan, not strictly per-image)
+                    let alt = "";
+                    for (const d of Array.from(p.getElementsByTagNameNS(OOXML_NS.wp, "docPr"))) {
+                        const descr = (d.getAttribute("descr") || "").trim();
+                        if (descr) { alt = descr; break; }
+                    }
+                    if (!alt) alt = "Article image";
+
+                    for (const blip of Array.from(p.getElementsByTagNameNS(OOXML_NS.a, "blip"))) {
+                        const rId = blip.getAttributeNS(OOXML_NS.r, "embed");
+                        const target = rId ? relsMap[rId] : null;
+                        if (!target) continue;
+
+                        const zipPath = "word/" + target.replace(/^\.?\/+/, "");
+                        const imgEntry = zip.file(zipPath);
+                        if (!imgEntry) continue;
+                        const bytes = await imgEntry.async("uint8array");
+
+                        const extMatch = target.match(/\.[a-zA-Z0-9]+$/);
+                        const ext = extMatch ? extMatch[0].toLowerCase() : ".png";
+
+                        imageCounter += 1;
+                        const filename = `${docxStem}_img${imageCounter}${ext}`;
+
+                        const extentEl = findExtent(blip);
+                        let widthPx = DEFAULT_IMAGE_WIDTH;
+                        if (extentEl) {
+                            const cx = parseInt(extentEl.getAttribute("cx"), 10);
+                            if (!isNaN(cx)) widthPx = Math.round((cx / 914400) * 96);
+                        }
+                        widthPx = Math.min(widthPx, DEFAULT_IMAGE_WIDTH);
+
+                        const url = GITHUB_IMAGE_BASE_URL + filename;
+                        extractedImages.push({ filename, bytes });
+
+                        ensureCurrent().blocks.push({
+                            kind: "image",
+                            content: `<img src="${url}"\n     alt="${escapeHtml(alt)}"\n     width="${widthPx}"\n     loading="lazy">`
+                        });
+                    }
+
+                    if (!text) continue;
+
+                    if (titleRepeatOpen) {
+                        const paraWords = normalizeForCompare(text).split(" ").filter(Boolean);
+                        const n = paraWords.length;
+                        const nextChunk = titleWords.slice(titleWordsConsumed, titleWordsConsumed + n);
+                        const matchesNextChunk = n > 0 && nextChunk.length === n && nextChunk.every((w, i) => w === paraWords[i]);
+
+                        if (matchesNextChunk) {
+                            titleWordsConsumed += n;
+                            if (titleWordsConsumed >= titleWords.length) titleWordsConsumed = 0;
+                            continue;
+                        } else if (isTitleStyle(p)) {
+                            // Always drop the real Title-styled paragraph even if its
+                            // wording doesn't line up with the running match.
+                            titleWordsConsumed = 0;
+                            continue;
+                        } else {
+                            titleRepeatOpen = false;
+                        }
+                    }
+
+                    let heading;
+                    if (headingMode === "numbered") heading = isHeading(p) || looksLikeNumberedHeading(text);
+                    else if (headingMode === "heuristic") heading = isHeading(p) || looksLikeHeadingText(text);
+                    else heading = isHeading(p);
+
+                    if (heading) {
+                        current = { title: text, blocks: [] };
+                        sections.push(current);
+                        continue;
+                    }
+
+                    ensureCurrent().blocks.push({ kind: "text", content: text });
+
+                } else if (child.namespaceURI === OOXML_NS.w && child.localName === "tbl") {
+                    ensureCurrent().blocks.push({ kind: "table", content: renderTableBlock(child) });
+                }
+                // other body children (sectPr etc.) are structural -- skip.
+            }
+
+            const content = renderContentHtml(sections);
+            const readTime = calculateReadTime(content);
+
+            return { title, content, readTime, extractedImages, headingMode };
+        }
+
+        // --- GitHub Contents API upload (browser fetch equivalent of the
+        // Python script's --github-upload) ---
+        async function githubCheckSha(repoPath, token) {
+            const res = await fetch(
+                `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${repoPath}?ref=${GITHUB_BRANCH}`,
+                { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } }
+            );
+            if (res.status === 404) return null;
+            if (!res.ok) throw new Error(`GitHub check failed for ${repoPath}: ${res.status}`);
+            const data = await res.json();
+            return data.sha || null;
+        }
+
+        async function githubUploadFile(bytes, filename, token) {
+            const repoPath = `${GITHUB_REPO_IMAGE_PATH}/${filename}`;
+            const sha = await githubCheckSha(repoPath, token);
+            const body = {
+                message: `Add/update article image ${filename}`,
+                content: bytesToBase64(bytes),
+                branch: GITHUB_BRANCH
+            };
+            if (sha) body.sha = sha;
+
+            const res = await fetch(
+                `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${repoPath}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: "application/vnd.github+json",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(body)
+                }
+            );
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`${res.status} ${errText.slice(0, 200)}`);
+            }
+        }
+
+        // =========================================================================
+        // 3c. FILE PICKER WIRING + DOWNLOADS (JSON / Preview HTML)
+        // =========================================================================
+        let loadedArticle = null;   // {title, content, readTime} once conversion succeeds
+        let pendingImages = [];     // [{filename, bytes}] still needing GitHub upload
+        let docxStemForDownload = "article"; // base filename, e.g. "KartikConsumption"
+
+        function setFilePickerStatus(message, state) {
+            const statusEl = document.getElementById("filePickerStatus");
+            statusEl.textContent = message;
+            statusEl.className = "file-picker-status" + (state ? ` ${state}` : "");
+        }
+
+        function triggerDownload(filename, content, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        // Mirrors docx_to_article.py's render_preview_html(): a standalone,
+        // readable HTML page styled like the publisher UI, so <h3> sections,
+        // <p> paragraphs, images, and tables can be visually checked. Images
+        // use the live GitHub raw-content URL as-is (equivalent to the CLI's
+        // --preview-remote), since there's no local images/ folder to
+        // reference in a browser -- upload the images first for it to
+        // render correctly.
+        function buildPreviewHtml(title, content, readTime, sourceName) {
+            const safeTitle = escapeHtml(title);
+            const subtitle = sourceName ? `Source: ${escapeHtml(sourceName)} &nbsp;|&nbsp; ` : "";
+            return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview: ${safeTitle}</title>
+    <style>
+        :root {
+            --primary-color: #4d2588;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #212529;
+            --meta-color: #6c757d;
+            --border-color: #e9ecef;
+            --radius: 8px;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 40px 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.7;
+        }
+        .article-card {
+            max-width: 720px;
+            margin: 0 auto;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            padding: 40px 48px;
+        }
+        h1 {
+            font-size: 1.9rem;
+            color: var(--primary-color);
+            margin: 0 0 8px 0;
+            line-height: 1.3;
+        }
+        .meta {
+            font-size: 0.85rem;
+            color: var(--meta-color);
+            margin-bottom: 32px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        h3 {
+            color: var(--primary-color);
+            font-size: 1.25rem;
+            margin: 32px 0 12px 0;
+        }
+        h3:first-of-type { margin-top: 0; }
+        p {
+            margin: 0 0 16px 0;
+            font-size: 1rem;
+        }
+        p img {
+            max-width: 100%;
+            height: auto;
+            border-radius: var(--radius);
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="article-card">
+        <h1>${safeTitle}</h1>
+        <div class="meta">${subtitle}${readTime} min read</div>
+        ${content}
+    </div>
+</body>
+</html>
+`;
+        }
+
+        document.getElementById("downloadJsonBtn").addEventListener("click", () => {
+            if (!loadedArticle) return;
+            const json = JSON.stringify(loadedArticle, null, 2);
+            triggerDownload(`${docxStemForDownload}.json`, json, "application/json");
+        });
+
+        document.getElementById("downloadPreviewBtn").addEventListener("click", () => {
+            if (!loadedArticle) return;
+            const html = buildPreviewHtml(
+                loadedArticle.title, loadedArticle.content, loadedArticle.readTime,
+                docxStemForDownload + ".docx"
+            );
+            triggerDownload(`${docxStemForDownload}_preview.html`, html, "text/html");
+        });
+
+        document.getElementById("articleFileInput").addEventListener("change", async (event) => {
+            const file = event.target.files && event.target.files[0];
+            loadedArticle = null;
+            pendingImages = [];
+            document.getElementById("downloadActions").style.display = "none";
+
+            if (!file) {
+                setFilePickerStatus("No file selected");
+                return;
+            }
+
+            docxStemForDownload = file.name.replace(/\.docx$/i, "");
+            setFilePickerStatus(`Parsing "${file.name}"...`);
+
+            try {
+                const result = await convertDocxFile(file);
+
+                // Sanitize the built content as a defense-in-depth pass (the
+                // image/table blocks are self-built HTML, not raw user input,
+                // but this keeps parity with the sanitization the old manual
+                // flow always applied before dispatch).
+                const cleanContent = typeof DOMPurify !== 'undefined'
+                    ? DOMPurify.sanitize(result.content, { FORBID_ATTR: ['style'], ADD_ATTR: ['target'] })
+                    : result.content;
+
+                loadedArticle = { title: result.title, content: cleanContent, readTime: result.readTime };
+                pendingImages = result.extractedImages;
+                document.getElementById("downloadActions").style.display = "flex";
+
+                let note = "";
+                if (result.headingMode === "numbered") note = " [numbered-heading pattern used]";
+                else if (result.headingMode === "heuristic") note = " [WARNING: headings guessed heuristically -- spot-check]";
+
+                const imgNote = pendingImages.length ? `, ${pendingImages.length} image(s) to upload` : "";
+                setFilePickerStatus(
+                    `Loaded "${loadedArticle.title}" (${loadedArticle.readTime} min read${imgNote})${note}`,
+                    result.headingMode === "heuristic" ? "error" : "loaded"
+                );
+            } catch (err) {
+                console.error("Failed to parse docx:", err);
+                setFilePickerStatus(`Error: ${err.message || "Could not parse .docx file"}`, "error");
+            }
+        });
+
+        // =========================================================================
+        // 4. MAIN DIRECT PUBLISHING PROCESS
+        // =========================================================================
+        async function publishDirectUserContent() {
+            try {
+                document.getElementById("logOutput").textContent = "";
+
+                // Step 1: Article JSON must already be loaded via the file picker
+                if (!loadedArticle) {
+                    logToScreen("[System] Publishing canceled: no valid article JSON file selected.");
+                    alert("Please choose a valid article JSON file first.");
+                    return;
+                }
+                const { title: articleTitle, content, readTime } = loadedArticle;
+                logToScreen(`[System] Using loaded article: "${articleTitle}" (${readTime} min read)`);
+
+                // Step 2: Private Key Input & FLO Address Derivation
+                const myPrivKey = prompt("Enter your Private Key (WIF):");
+                if (!myPrivKey) {
+                    logToScreen("[System] Publishing canceled: Private Key is required.");
+                    return;
+                }
+
+                const myFloID = floCrypto.getAddress(myPrivKey);
+                if (!myFloID) {
+                    logToScreen("[Error] Could not derive FLO Address from WIF.");
+                    alert("Invalid Private Key format. Please try again.");
+                    return;
+                }
+
+                logToScreen(`[System] Derived FLO Address: ${myFloID}`);
+
+                // Authenticate user session
+                floCloudAPI.user(myFloID, myPrivKey);
+                floGlobals.myFloID = myFloID;
+
+                // Step 3: Contributors
+                const contributorsInput = prompt(
+                    "Enter additional Contributors (comma-separated, alphanumeric only). Leave blank if none:",
+                    ""
+                );
+                const contributors = parseContributors(contributorsInput, myFloID);
+                logToScreen(`[System] Contributors: ${contributors.join(", ")}`);
+
+                // Step 3b: Upload any images extracted from the docx to GitHub
+                // (images/<filename> under owner/repo@branch), so the URLs
+                // already baked into `content` resolve once published.
+                if (pendingImages.length > 0) {
+                    const githubToken = prompt(
+                        `This article has ${pendingImages.length} image(s) to upload to GitHub ` +
+                        `(${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${GITHUB_REPO_IMAGE_PATH}). ` +
+                        `Enter a GitHub token with 'contents: write' access:`
+                    );
+
+                    if (!githubToken) {
+                        const proceedAnyway = confirm(
+                            "No GitHub token entered -- images will NOT be uploaded and their links " +
+                            "will be broken in the published article. Publish anyway?"
+                        );
+                        if (!proceedAnyway) {
+                            logToScreen("[System] Publishing canceled: GitHub token not provided.");
+                            return;
+                        }
+                        logToScreen("[Warning] Skipping image upload; image links may be broken.");
+                    } else {
+                        logToScreen(`[System] Uploading ${pendingImages.length} image(s) to GitHub...`);
+                        let failures = 0;
+                        for (const img of pendingImages) {
+                            try {
+                                await githubUploadFile(img.bytes, img.filename, githubToken);
+                                logToScreen(`  Uploaded: ${GITHUB_REPO_IMAGE_PATH}/${img.filename}`);
+                            } catch (err) {
+                                failures += 1;
+                                logToScreen(`  [ERROR] Upload failed for ${img.filename}: ${err.message}`);
+                            }
+                        }
+                        if (failures > 0) {
+                            const proceedAnyway = confirm(
+                                `${failures} of ${pendingImages.length} image(s) failed to upload. ` +
+                                `Publish anyway (those image links will be broken)?`
+                            );
+                            if (!proceedAnyway) {
+                                logToScreen("[System] Publishing canceled after image upload failures.");
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                logToScreen(`[Loaded Article Content]:\n${content}\n`);
+
+                // Step 4: Initialize SuperNodes
+                logToScreen("[System] Initializing SuperNodes...");
+                await floCloudAPI.init(supernodesList);
+
+                // Step 5: Construct Payload (Matching original sendGeneralData contract)
+                const articleID = floCrypto.randString(16, true);
+
+                // Step 6: Dispatch Request via sendGeneralData
+                logToScreen("[System] Dispatching request to RanchiMall Times...");
+                
+                return floCloudAPI.sendGeneralData({
+                    articleID: articleID,
+                    title: articleTitle,
+                    content: content,
+                    readTime: readTime,
+                    contributors: contributors
+                }, 'publishing_requests', {
+                    application: 'RM_Times',
+                    receiverID: 'FF5pewfsJxyrCvg8a2C8VXefeyVvKvQxmF'
+                })
+                .then(res => {
+                    console.log("Publication response:", res);
+                    logToScreen("[System] Result:\n" + JSON.stringify(res, null, 2));
+                    alert("Publication request submitted successfully!");
+                    return res;
+                })
+                .catch(err => {
+                    console.error("Publication error:", err);
+                    logToScreen("[Error] " + (err.message || JSON.stringify(err)));
+                    alert("Publication request failed.");
+                });
+
+            } catch (err) {
+                console.error("Failed to execute publishing routine:", err);
+                logToScreen("[Error] " + (err.message || JSON.stringify(err)));
+            }
+        }
+    </script>
+</body>
+</html>
