@@ -1,7 +1,7 @@
 # rmtimesuploader
 Submit your article in docx format using this single page html for publishing in RanchiMall Times
 
-Here is the raw Markdown code for your `README.md` file. You can click the copy button on the top right of the code block below:
+
 
 
 
