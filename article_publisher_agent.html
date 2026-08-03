@@ -230,15 +230,21 @@
             </div>
         </div>
 
+        <div class="file-picker-wrap" style="margin-top: 16px;">
+            <label for="heroImageFileInput" class="file-picker-label">Choose Hero Image (Optional)</label>
+            <input type="file" id="heroImageFileInput" accept="image/*">
+            <div id="heroImageStatus" class="file-picker-status">No hero image selected</div>
+        </div>
+
         <div class="role-selection">
             <div class="role-selection-title">Select Login / Publisher Option:</div>
             <label class="role-option">
                 <input type="radio" name="publisherRole" value="user" checked>
-                <span><strong>General User Login:</strong> Dual upload to Cloudinary & Google Drive</span>
+                <span><strong>General User Login:</strong></span>
             </label>
             <label class="role-option">
                 <input type="radio" name="publisherRole" value="subadmin">
-                <span><strong>Subadmin Login:</strong> Images uploaded to GitHub</span>
+                <span><strong>Subadmin Login:</strong></span>
             </label>
         </div>
 
@@ -751,8 +757,163 @@
             return data.secure_url;
         }
 
-        // --- GOOGLE DRIVE / APPS SCRIPT UPLOADER (GENERAL USER FALLBACK / SECONDARY) ---
-        async function googleDriveAppsScriptUpload(bytes, filename) {
+        // --- GOOGLE DRIVE / APPS SCRIPT REGISTRY & UPLOADER (GENERAL USER MODE) ---
+        async function calculateSha256Hex(bytes) {
+            const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+        }
+
+        async function processHeroImage(file) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const url = URL.createObjectURL(file);
+                img.onload = async () => {
+                    try {
+                        URL.revokeObjectURL(url);
+
+                        // 1. Center-crop & Resize to 800 x 450 px (16:9 Aspect Ratio)
+                        const mainCanvas = document.createElement("canvas");
+                        mainCanvas.width = 800;
+                        mainCanvas.height = 450;
+                        const mainCtx = mainCanvas.getContext("2d");
+
+                        const targetAspect = 800 / 450;
+                        const imgAspect = img.width / img.height;
+                        let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
+
+                        if (imgAspect > targetAspect) {
+                            sWidth = img.height * targetAspect;
+                            sx = (img.width - sWidth) / 2;
+                        } else {
+                            sHeight = img.width / targetAspect;
+                            sy = (img.height - sHeight) / 2;
+                        }
+
+                        mainCtx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, 800, 450);
+                        const mainBlob = await new Promise(res => mainCanvas.toBlob(res, "image/jpeg", 0.90));
+                        const mainBytes = new Uint8Array(await mainBlob.arrayBuffer());
+
+                        // 2. Generate Thumbnail (400 x 225 px, Guaranteed < 100 KB)
+                        const thumbCanvas = document.createElement("canvas");
+                        thumbCanvas.width = 400;
+                        thumbCanvas.height = 225;
+                        const thumbCtx = thumbCanvas.getContext("2d");
+                        thumbCtx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, 400, 225);
+
+                        let quality = 0.85;
+                        let thumbBlob = await new Promise(res => thumbCanvas.toBlob(res, "image/jpeg", quality));
+
+                        // Dynamically reduce JPEG quality if size > 100 KB (102,400 bytes)
+                        while (thumbBlob.size > 102400 && quality > 0.30) {
+                            quality -= 0.10;
+                            thumbBlob = await new Promise(res => thumbCanvas.toBlob(res, "image/jpeg", quality));
+                        }
+
+                        const thumbBytes = new Uint8Array(await thumbBlob.arrayBuffer());
+
+                        resolve({
+                            mainBytes,
+                            thumbBytes,
+                            mainSizeKb: Math.round(mainBlob.size / 1024),
+                            thumbSizeKb: Math.round(thumbBlob.size / 1024)
+                        });
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error("Failed to load hero image for processing."));
+                };
+                img.src = url;
+            });
+        }
+
+        function getLocalRegistry() {
+            try {
+                const stored = localStorage.getItem("rmtimes_image_registry");
+                return stored ? JSON.parse(stored) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveLocalRegistryEntry(hash, filename, cloudinaryUrl, gdriveUrl) {
+            try {
+                const registry = getLocalRegistry();
+                const existing = registry[hash] || {};
+                registry[hash] = {
+                    filename: filename,
+                    firstUploaded: existing.firstUploaded || new Date().toISOString(),
+                    lastReused: new Date().toISOString(),
+                    usageCount: (existing.usageCount || 1) + (existing.firstUploaded ? 1 : 0),
+                    providers: {
+                        cloudinary: cloudinaryUrl || existing.providers?.cloudinary || "",
+                        gdrive: gdriveUrl || existing.providers?.gdrive || ""
+                    }
+                };
+                localStorage.setItem("rmtimes_image_registry", JSON.stringify(registry));
+            } catch (e) {
+                console.warn("Failed to save local registry entry:", e);
+            }
+        }
+
+        async function checkGoogleDriveRegistry(imageHash) {
+            // 1. Check Local Browser Cache First
+            const localRegistry = getLocalRegistry();
+            if (localRegistry[imageHash]) {
+                const entry = localRegistry[imageHash];
+                entry.usageCount = (entry.usageCount || 1) + 1;
+                entry.lastReused = new Date().toISOString();
+                try {
+                    localStorage.setItem("rmtimes_image_registry", JSON.stringify(localRegistry));
+                } catch (e) {}
+
+                return {
+                    exists: true,
+                    source: "localCache",
+                    hash: imageHash,
+                    primaryUrl: entry.providers?.cloudinary || "",
+                    fallbackUrl: entry.providers?.gdrive || "",
+                    usageCount: entry.usageCount,
+                    providers: entry.providers
+                };
+            }
+
+            // 2. Query Google Drive Apps Script Server Registry
+            try {
+                const res = await fetch(GDRIVE_APPS_SCRIPT_URL, {
+                    method: "POST",
+                    redirect: "follow",
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8"
+                    },
+                    body: JSON.stringify({
+                        action: "checkHash",
+                        hash: imageHash
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.exists) {
+                        data.source = "serverRegistry";
+                        saveLocalRegistryEntry(imageHash, data.filename || "image", data.primaryUrl, data.fallbackUrl);
+                        return data;
+                    }
+                    if (data && data.error) {
+                        console.warn("Apps Script registry check returned error:", data.error);
+                    }
+                }
+            } catch (err) {
+                console.warn("Server registry check error:", err);
+            }
+
+            return { exists: false };
+        }
+
+        async function googleDriveAppsScriptUpload(bytes, filename, imageHash, cloudinaryUrl) {
             const mimeType = getMimeType(filename);
             const base64Data = bytesToBase64(bytes);
 
@@ -763,9 +924,12 @@
                     "Content-Type": "text/plain;charset=utf-8"
                 },
                 body: JSON.stringify({
+                    action: "upload",
                     fileName: filename,
                     mimeType: mimeType,
-                    base64: base64Data
+                    base64: base64Data,
+                    hash: imageHash || "",
+                    cloudinaryUrl: cloudinaryUrl || ""
                 })
             });
 
@@ -778,6 +942,11 @@
             if (!data.success || !data.url) {
                 throw new Error(data.error || "Google Drive upload failed or missing URL.");
             }
+
+            if (imageHash) {
+                saveLocalRegistryEntry(imageHash, filename, cloudinaryUrl, data.url);
+            }
+
             return data.url;
         }
 
@@ -900,6 +1069,18 @@
             triggerDownload(`${docxStemForDownload}_preview.html`, html, "text/html");
         });
 
+        document.getElementById("heroImageFileInput").addEventListener("change", (event) => {
+            const file = event.target.files && event.target.files[0];
+            const statusEl = document.getElementById("heroImageStatus");
+            if (file) {
+                statusEl.textContent = `Hero image: "${file.name}" selected`;
+                statusEl.className = "file-picker-status loaded";
+            } else {
+                statusEl.textContent = "No hero image selected";
+                statusEl.className = "file-picker-status";
+            }
+        });
+
         document.getElementById("articleFileInput").addEventListener("change", async (event) => {
             const file = event.target.files && event.target.files[0];
             loadedArticle = null;
@@ -1014,12 +1195,18 @@
                             }
                             logToScreen("[Warning] Skipping GitHub image upload; image links may be broken.");
                         } else {
-                            logToScreen(`[System] Uploading ${pendingImages.length} image(s) to GitHub...`);
+                            logToScreen(`[System] Processing ${pendingImages.length} image(s) for GitHub...`);
                             let failures = 0;
                             for (const img of pendingImages) {
                                 try {
-                                    await githubUploadFile(img.bytes, img.filename, githubToken);
-                                    logToScreen(`  Uploaded to GitHub: ${GITHUB_REPO_IMAGE_PATH}/${img.filename}`);
+                                    const repoPath = `${GITHUB_REPO_IMAGE_PATH}/${img.filename}`;
+                                    const sha = await githubCheckSha(repoPath, githubToken);
+                                    if (sha) {
+                                        logToScreen(`  [SKIPPED UPLOAD] File "${img.filename}" already exists on GitHub (SHA: ${sha.slice(0, 7)}). Reusing existing URL.`);
+                                    } else {
+                                        await githubUploadFile(img.bytes, img.filename, githubToken);
+                                        logToScreen(`  Uploaded to GitHub: ${GITHUB_REPO_IMAGE_PATH}/${img.filename}`);
+                                    }
                                 } catch (err) {
                                     failures += 1;
                                     logToScreen(`  [ERROR] GitHub upload failed for ${img.filename}: ${err.message}`);
@@ -1037,41 +1224,78 @@
                             }
                         }
                     } else {
-                        // GENERAL USER MODE: Dual Upload to Cloudinary & Google Drive via Google Apps Script
-                        logToScreen(`[System] Uploading ${pendingImages.length} image(s) to Cloudinary & Google Drive...`);
+                        // GENERAL USER MODE: Registry-based Dual Upload (Cloudinary + Google Drive)
+                        logToScreen(`[System] Processing ${pendingImages.length} image(s) (Cloudinary + Google Drive Registry)...`);
                         let failures = 0;
 
                         for (const img of pendingImages) {
-                            let cloudinaryUrl = null;
-                            let gdriveUrl = null;
-
-                            // 1. Upload to Cloudinary
                             try {
-                                cloudinaryUrl = await cloudinaryUploadFile(img.bytes, img.filename);
-                                logToScreen(`  [1/2] Cloudinary upload successful: ${cloudinaryUrl}`);
-                            } catch (err) {
-                                logToScreen(`  [WARNING] Cloudinary upload failed for ${img.filename}: ${err.message}`);
-                            }
+                                const imageHash = await calculateSha256Hex(img.bytes);
+                                logToScreen(`  [Checking Registry] ${img.filename} (Hash: ${imageHash.slice(0, 12)}...)`);
 
-                            // 2. Upload to Google Drive via Google Apps Script
-                            try {
-                                gdriveUrl = await googleDriveAppsScriptUpload(img.bytes, img.filename);
-                                logToScreen(`  [2/2] Google Drive upload successful: ${gdriveUrl}`);
-                            } catch (err) {
-                                logToScreen(`  [WARNING] Google Drive upload failed for ${img.filename}: ${err.message}`);
-                            }
+                                let registryResult = null;
+                                try {
+                                    registryResult = await checkGoogleDriveRegistry(imageHash);
+                                } catch (checkErr) {
+                                    console.warn("Registry lookup error:", checkErr);
+                                }
 
-                            // Handle runtime fallback if both Cloudinary and Google Drive succeeded
-                            if (cloudinaryUrl && gdriveUrl) {
-                                const replacement = `${cloudinaryUrl}" data-backup="${gdriveUrl}" onerror="this.onerror=null;if(this.dataset.backup){this.src=this.dataset.backup;}`;
-                                articleContent = articleContent.replaceAll(img.placeholderUrl, replacement);
-                            } else if (cloudinaryUrl) {
-                                articleContent = articleContent.replaceAll(img.placeholderUrl, cloudinaryUrl);
-                            } else if (gdriveUrl) {
-                                articleContent = articleContent.replaceAll(img.placeholderUrl, gdriveUrl);
-                            } else {
+                                if (registryResult && registryResult.exists) {
+                                    const primaryUrl = registryResult.primaryUrl || (registryResult.providers && registryResult.providers.cloudinary) || "";
+                                    const fallbackUrl = registryResult.fallbackUrl || (registryResult.providers && registryResult.providers.gdrive) || "";
+                                    const usageCount = registryResult.usageCount || 2;
+
+                                    logToScreen(`  [SKIPPED UPLOAD] Duplicate image detected for "${img.filename}":`);
+                                    if (primaryUrl) logToScreen(`    ├─ Reused Primary (Cloudinary): ${primaryUrl}`);
+                                    if (fallbackUrl) logToScreen(`    ├─ Reused Fallback (Google Drive): ${fallbackUrl}`);
+                                    logToScreen(`    └─ Total Usage Count: ${usageCount}`);
+
+                                    if (primaryUrl && fallbackUrl) {
+                                        const replacement = `${primaryUrl}" data-backup="${fallbackUrl}" onerror="this.onerror=null;if(this.dataset.backup){this.src=this.dataset.backup;}`;
+                                        articleContent = articleContent.replaceAll(img.placeholderUrl, replacement);
+                                    } else if (primaryUrl) {
+                                        articleContent = articleContent.replaceAll(img.placeholderUrl, primaryUrl);
+                                    } else if (fallbackUrl) {
+                                        articleContent = articleContent.replaceAll(img.placeholderUrl, fallbackUrl);
+                                    }
+                                    continue;
+                                }
+
+                                // Hash not found in registry -- upload to Cloudinary first, then Google Drive
+                                let cloudinaryUrl = null;
+                                let gdriveUrl = null;
+
+                                // 1. Upload to Cloudinary
+                                try {
+                                    cloudinaryUrl = await cloudinaryUploadFile(img.bytes, img.filename);
+                                    logToScreen(`    [1/2] Cloudinary upload successful: ${cloudinaryUrl}`);
+                                } catch (err) {
+                                    logToScreen(`    [WARNING] Cloudinary upload failed for ${img.filename}: ${err.message}`);
+                                }
+
+                                // 2. Upload to Google Drive via Google Apps Script (passing hash + cloudinaryUrl for registry)
+                                try {
+                                    gdriveUrl = await googleDriveAppsScriptUpload(img.bytes, img.filename, imageHash, cloudinaryUrl);
+                                    logToScreen(`    [2/2] Google Drive upload & registry update successful: ${gdriveUrl}`);
+                                } catch (err) {
+                                    logToScreen(`    [WARNING] Google Drive upload failed for ${img.filename}: ${err.message}`);
+                                }
+
+                                // Handle runtime fallback if both Cloudinary and Google Drive succeeded
+                                if (cloudinaryUrl && gdriveUrl) {
+                                    const replacement = `${cloudinaryUrl}" data-backup="${gdriveUrl}" onerror="this.onerror=null;if(this.dataset.backup){this.src=this.dataset.backup;}`;
+                                    articleContent = articleContent.replaceAll(img.placeholderUrl, replacement);
+                                } else if (cloudinaryUrl) {
+                                    articleContent = articleContent.replaceAll(img.placeholderUrl, cloudinaryUrl);
+                                } else if (gdriveUrl) {
+                                    articleContent = articleContent.replaceAll(img.placeholderUrl, gdriveUrl);
+                                } else {
+                                    failures += 1;
+                                    logToScreen(`    [ERROR] Both Cloudinary and Google Drive uploads failed for ${img.filename}`);
+                                }
+                            } catch (imgErr) {
                                 failures += 1;
-                                logToScreen(`  [ERROR] Both Cloudinary and Google Drive uploads failed for ${img.filename}`);
+                                logToScreen(`    [ERROR] Failed to process image ${img.filename}: ${imgErr.message}`);
                             }
                         }
 
@@ -1088,6 +1312,89 @@
                     }
                 }
 
+                // Handle Optional Hero Image Upload (Resized 800x450 + <100KB Thumbnail)
+                let uploadedHeroImage = null;
+                const heroInput = document.getElementById("heroImageFileInput");
+                const heroFile = heroInput && heroInput.files && heroInput.files[0];
+
+                if (heroFile) {
+                    logToScreen(`[System] Resizing & Processing Hero Image: "${heroFile.name}"...`);
+                    try {
+                        const { mainBytes, thumbBytes, mainSizeKb, thumbSizeKb } = await processHeroImage(heroFile);
+                        logToScreen(`  ├─ Resized Main Image: 800x450 px (${mainSizeKb} KB)`);
+                        logToScreen(`  └─ Generated Thumbnail: 400x225 px (${thumbSizeKb} KB - <100KB target)`);
+
+                        const mainHash = await calculateSha256Hex(mainBytes);
+                        const thumbHash = await calculateSha256Hex(thumbBytes);
+
+                        const stem = heroFile.name.replace(/\.[^/.]+$/, "").replace(/\s+/g, '_');
+                        const mainFilename = `hero_${stem}_800x450.jpg`;
+                        const thumbFilename = `hero_${stem}_thumb.jpg`;
+
+                        let mainCloudinaryUrl = "", mainGdriveUrl = "";
+                        let thumbCloudinaryUrl = "", thumbGdriveUrl = "";
+
+                        if (isSubadminRole) {
+                            const githubToken = prompt("Enter GitHub token to upload Hero Image to GitHub repository:");
+                            if (githubToken) {
+                                // Upload main 800x450
+                                const mainRepoPath = `${GITHUB_REPO_IMAGE_PATH}/${mainFilename}`;
+                                if (!await githubCheckSha(mainRepoPath, githubToken)) {
+                                    await githubUploadFile(mainBytes, mainFilename, githubToken);
+                                }
+                                mainCloudinaryUrl = GITHUB_IMAGE_BASE_URL + mainFilename;
+                                mainGdriveUrl = mainCloudinaryUrl;
+
+                                // Upload thumbnail <100KB
+                                const thumbRepoPath = `${GITHUB_REPO_IMAGE_PATH}/${thumbFilename}`;
+                                if (!await githubCheckSha(thumbRepoPath, githubToken)) {
+                                    await githubUploadFile(thumbBytes, thumbFilename, githubToken);
+                                }
+                                thumbCloudinaryUrl = GITHUB_IMAGE_BASE_URL + thumbFilename;
+                                thumbGdriveUrl = thumbCloudinaryUrl;
+
+                                logToScreen(`  [Hero Image] Main & Thumbnail uploaded to GitHub repository.`);
+                            }
+                        } else {
+                            // General User Dual Upload: Main 800x450
+                            const mainReg = await checkGoogleDriveRegistry(mainHash);
+                            if (mainReg && mainReg.exists) {
+                                mainCloudinaryUrl = mainReg.primaryUrl || (mainReg.providers && mainReg.providers.cloudinary) || "";
+                                mainGdriveUrl = mainReg.fallbackUrl || (mainReg.providers && mainReg.providers.gdrive) || "";
+                                logToScreen(`  [Main Hero Image] Reused existing registry URLs.`);
+                            } else {
+                                mainCloudinaryUrl = await cloudinaryUploadFile(mainBytes, mainFilename);
+                                mainGdriveUrl = await googleDriveAppsScriptUpload(mainBytes, mainFilename, mainHash, mainCloudinaryUrl);
+                                logToScreen(`  [Main Hero Image Uploaded] 800x450 px (${mainSizeKb} KB)`);
+                            }
+
+                            // General User Dual Upload: Thumbnail <100KB
+                            const thumbReg = await checkGoogleDriveRegistry(thumbHash);
+                            if (thumbReg && thumbReg.exists) {
+                                thumbCloudinaryUrl = thumbReg.primaryUrl || (thumbReg.providers && thumbReg.providers.cloudinary) || "";
+                                thumbGdriveUrl = thumbReg.fallbackUrl || (thumbReg.providers && thumbReg.providers.gdrive) || "";
+                                logToScreen(`  [Hero Thumbnail] Reused existing registry URLs.`);
+                            } else {
+                                thumbCloudinaryUrl = await cloudinaryUploadFile(thumbBytes, thumbFilename);
+                                thumbGdriveUrl = await googleDriveAppsScriptUpload(thumbBytes, thumbFilename, thumbHash, thumbCloudinaryUrl);
+                                logToScreen(`  [Hero Thumbnail Uploaded] 400x225 px (${thumbSizeKb} KB - <100KB)`);
+                            }
+                        }
+
+                        uploadedHeroImage = {
+                            cloudinaryUrl: mainCloudinaryUrl,
+                            gdriveUrl: mainGdriveUrl,
+                            filename: mainFilename,
+                            thumbnailCloudinaryUrl: thumbCloudinaryUrl,
+                            thumbnailGdriveUrl: thumbGdriveUrl,
+                            thumbnailFilename: thumbFilename,
+                            thumbSizeKb: thumbSizeKb
+                        };
+                    } catch (heroErr) {
+                        logToScreen(`  [WARNING] Hero image processing failed: ${heroErr.message}`);
+                    }
+                }
+
                 logToScreen(`[Loaded Article Content]:\n${articleContent}\n`);
 
                 // Step 5: Initialize SuperNodes
@@ -1098,13 +1405,18 @@
                 const articleID = floCrypto.randString(16, true);
                 logToScreen("[System] Dispatching request to RanchiMall Times...");
                 
-                return floCloudAPI.sendGeneralData({
+                const payload = {
                     articleID: articleID,
                     title: articleTitle,
                     content: articleContent,
                     readTime: readTime,
                     contributors: contributors
-                }, 'publishing_requests', {
+                };
+                if (uploadedHeroImage) {
+                    payload.heroImage = uploadedHeroImage;
+                }
+
+                return floCloudAPI.sendGeneralData(payload, 'publishing_requests', {
                     application: 'RM_Times',
                     receiverID: 'FF5pewfsJxyrCvg8a2C8VXefeyVvKvQxmF'
                 })
