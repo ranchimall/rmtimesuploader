@@ -1,0 +1,2208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RM Times - Direct Content Publisher (Cloudinary + Google Drive Dual Upload)</title>
+    
+    <!-- floGlobals MUST be defined before floCloudAPI.js loads -->
+    <script>
+        const globalScope = typeof window !== 'undefined' ? window : global;
+
+        globalScope.floGlobals = globalScope.floGlobals || {};
+
+        floGlobals.SNStorageID = floGlobals.SNStorageID || "FNaN9McoBAEFUjkRmNQRYLmBF8SpS7Tgfk";
+        floGlobals.adminID = floGlobals.adminID || "FNaN9McoBAEFUjkRmNQRYLmBF8SpS7Tgfk";
+        floGlobals.application = floGlobals.application || "RM_Times";
+        floGlobals.subAdmins = floGlobals.subAdmins || [];
+        floGlobals.settings = floGlobals.settings || {};
+    </script>
+
+    <!-- External Dependencies: DOMPurify, JSZip, lib, floCrypto, & floCloudAPI -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://ranchimall.github.io/cc/scripts/lib.js"></script>
+    <script src="https://ranchimall.github.io/cc/scripts/floCrypto.js"></script>
+    <script src="https://ranchimall.github.io/cc/scripts/floCloudAPI.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #4d2588;
+            --primary-hover: #3b196c;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #212529;
+            --border-color: #e9ecef;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            width: 100%;
+            padding: 32px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+        }
+
+        p {
+            font-size: 0.95rem;
+            color: #6c757d;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .role-selection {
+            margin-bottom: 20px;
+            text-align: left;
+            background: #f1ecf9;
+            border: 1px solid #d4c5ed;
+            padding: 16px;
+            border-radius: var(--radius);
+        }
+
+        .role-selection-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .role-option {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .role-option:last-child {
+            margin-bottom: 0;
+        }
+
+        .role-option input[type="radio"] {
+            margin-right: 10px;
+            accent-color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .btn-publish {
+            background-color: var(--primary-color);
+            color: #ffffff;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            width: 100%;
+        }
+
+        .btn-publish:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-publish:active {
+            transform: scale(0.98);
+        }
+
+        .file-picker-wrap {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .file-picker-label {
+            display: inline-block;
+            background-color: #ffffff;
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .file-picker-label:hover {
+            background-color: #f3effa;
+        }
+
+        #articleFileInput {
+            display: none;
+        }
+
+        .file-picker-status {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        .file-picker-status.loaded {
+            color: #1e7e34;
+            font-weight: 600;
+        }
+
+        .file-picker-status.error {
+            color: #c0392b;
+            font-weight: 600;
+        }
+
+        .download-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn-secondary {
+            background-color: #ffffff;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--bg-color);
+        }
+
+        #logOutput {
+            margin-top: 24px;
+            text-align: left;
+            background: #1e1e1e;
+            color: #4af626;
+            padding: 16px;
+            border-radius: var(--radius);
+            font-family: "Courier New", Courier, monospace;
+            font-size: 0.85rem;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* --- Structure Review Panel --- */
+        .structure-review {
+            text-align: left;
+            margin-bottom: 20px;
+            background: #fffbea;
+            border: 1px solid #f0e2a3;
+            border-radius: var(--radius);
+            padding: 16px;
+        }
+
+        .structure-review-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            gap: 10px;
+        }
+
+        .fullscreen-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 5px 12px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .structure-review.is-fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 99999;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            box-sizing: border-box;
+            background: #fffbea;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 30px;
+            box-shadow: none;
+            overflow: hidden;
+        }
+
+        .structure-review.is-fullscreen #structureEditBody {
+            display: flex !important;
+            flex-direction: column;
+            flex: 1 1 auto;
+            min-height: 0;
+            height: 100%;
+        }
+
+        .structure-review.is-fullscreen .structure-list {
+            max-height: none;
+            flex: 1 1 auto;
+            min-height: 160px;
+            height: 100%;
+            overflow-y: auto;
+            border: 1px solid #dcd195;
+        }
+
+        .structure-review.is-fullscreen .structure-review-actions {
+            margin-top: 14px;
+            padding-top: 10px;
+            border-top: 1px solid #ebdca0;
+        }
+
+        .structure-review-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 4px;
+        }
+
+        .structure-review-sub {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-bottom: 14px;
+            line-height: 1.4;
+        }
+
+        .structure-title-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-color);
+            margin-bottom: 4px;
+        }
+
+        .structure-title-input {
+            width: 100%;
+            padding: 8px 10px;
+            font-size: 0.9rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            margin-bottom: 14px;
+        }
+
+        .structure-list {
+            max-height: 420px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: #ffffff;
+            padding: 10px;
+        }
+
+        .structure-section-card {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        .structure-section-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .structure-section-label {
+            background: var(--primary-color);
+            color: #ffffff;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            padding: 6px 10px;
+        }
+
+        .structure-intro-card .structure-section-label {
+            background: #9c8bb5;
+        }
+
+        .structure-section-body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .structure-section-body:empty {
+            display: none;
+        }
+
+        .structure-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.85rem;
+        }
+
+        .structure-item:last-child {
+            border-bottom: none;
+        }
+
+        .structure-item.is-heading {
+            background: #f1ecf9;
+        }
+
+        .structure-item.non-toggle {
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .structure-item-checkbox-wrap {
+            flex-shrink: 0;
+            padding-top: 2px;
+        }
+
+        .structure-item-checkbox-wrap input[type="checkbox"] {
+            accent-color: var(--primary-color);
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+
+        .structure-item-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .structure-item-text {
+            word-break: break-word;
+        }
+
+        .structure-item.is-heading .structure-item-text {
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .structure-item-badge {
+            display: inline-block;
+            margin-top: 3px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            color: #6c757d;
+        }
+
+        .structure-edit-btn {
+            flex-shrink: 0;
+            align-self: flex-start;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+        }
+
+        .structure-header-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex-shrink: 0;
+            align-items: stretch;
+        }
+
+        .structure-header-actions .btn-secondary {
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+        }
+
+        .structure-list-toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .structure-list-toolbar .btn-secondary {
+            flex: 1;
+            padding: 6px 8px;
+            font-size: 0.78rem;
+        }
+
+        .structure-section-card.is-collapsed .structure-section-label {
+            opacity: 0.85;
+        }
+
+        .structure-item-edit-input {
+            width: 100%;
+            padding: 6px 8px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+        }
+
+        .structure-item-edit-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .structure-item-edit-actions .btn-secondary {
+            padding: 4px 10px;
+            font-size: 0.75rem;
+        }
+
+        .structure-review-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        .structure-review-actions .btn-publish {
+            flex: 1;
+            min-width: 180px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>RM Times Content Creator</h1>
+        <p>Select the article <code>.docx</code> file, choose your login type, and publish directly to RanchiMall Times.</p>
+
+        <div class="file-picker-wrap">
+            <label for="articleFileInput" class="file-picker-label">Choose Article .docx File</label>
+            <input type="file" id="articleFileInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+            <div id="filePickerStatus" class="file-picker-status">No file selected</div>
+            <div id="downloadActions" class="download-actions" style="display:none;">
+                <button type="button" class="btn-secondary" id="downloadJsonBtn">Download JSON</button>
+                <button type="button" class="btn-secondary" id="downloadPreviewBtn">Download Preview HTML</button>
+            </div>
+        </div>
+
+        <div id="structureReview" class="structure-review" style="display:none;">
+            <div class="structure-review-header">
+                <div class="structure-review-title">Review Detected Structure</div>
+                <button type="button" class="btn-secondary fullscreen-btn" id="toggleFullscreenBtn" title="Toggle Fullscreen View (Esc to exit)">
+                    <span id="fullscreenIcon">⛶</span> <span id="fullscreenText">Fullscreen View</span>
+                </button>
+            </div>
+
+            <div id="structureEditBody">
+                <div class="structure-review-sub">
+                    Each paragraph below was auto-classified. <strong>Checked</strong> items become a Section title;
+                    <strong>unchecked</strong> items become paragraph content of the section above them. Uncheck
+                    anything wrongly picked as a Section, or check anything missed. Images/Tables are shown for
+                    context and are not togglable. Edit the Title if needed, then confirm.
+                </div>
+
+                <label class="structure-title-label" for="reviewTitleInput">Article Title</label>
+                <input type="text" id="reviewTitleInput" class="structure-title-input">
+
+                <div class="structure-list-toolbar">
+                    <button type="button" class="btn-secondary" id="collapseAllBtn">Collapse All Sections</button>
+                    <button type="button" class="btn-secondary" id="expandAllBtn">Expand All Sections</button>
+                </div>
+
+                <div id="structureList" class="structure-list"></div>
+
+                <div class="structure-review-actions">
+                    <button type="button" class="btn-secondary" id="resetStructureBtn">Reset to Detected</button>
+                    <button type="button" class="btn-publish" id="confirmStructureBtn">Confirm &amp; Build Article</button>
+                </div>
+            </div>
+
+            <div id="structureConfirmStatus" class="file-picker-status" style="margin-top:12px; display:none;"></div>
+            <button type="button" class="btn-secondary" id="toggleStructureEditBtn" style="display:none; margin-top:10px;">Review / Edit Sections</button>
+        </div>
+
+
+        <div class="file-picker-wrap" style="margin-top: 16px;">
+            <label for="heroImageFileInput" class="file-picker-label">Choose Hero Image (Optional)</label>
+            <input type="file" id="heroImageFileInput" accept="image/*">
+            <div id="heroImageStatus" class="file-picker-status">No hero image selected</div>
+        </div>
+
+        <div class="role-selection">
+            <div class="role-selection-title">Select Login / Publisher Option:</div>
+            <label class="role-option">
+                <input type="radio" name="publisherRole" value="user" checked>
+                <span><strong>General User Login:</strong></span>
+            </label>
+            <label class="role-option">
+                <input type="radio" name="publisherRole" value="subadmin">
+                <span><strong>Subadmin Login:</strong></span>
+            </label>
+        </div>
+
+        <button class="btn-publish" onclick="publishDirectUserContent()">
+            Start Direct Creator & Publish
+        </button>
+
+        <div id="logOutput"></div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // 1. SUPERNODE CONFIGURATION
+        // =========================================================================
+        const supernodesList = {
+            "FQUepiEXu4zhEtENqLA8RXdidXYiCUPeuc": {
+                uri: "ranchimallcloud1.duckdns.org",
+                pubKey: "03A0AD65FFBB8CAE0316BC93EE2BD6BDDF3A47970C2D550E4E1C7DFC559F131EA2"
+            },
+            "FBjW246c4VT9KC4p5CLsEjd7gMGcaFWBov": {
+                uri: "ranchimallcloud0.duckdns.org",
+                pubKey: "03DABC832B95F088CA88F87D154B73B415F085945CFF3D4C36DCE081518D229B31"
+            }
+        };
+
+        // =========================================================================
+        // 2. ENDPOINTS CONFIGURATION
+        // =========================================================================
+        const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/isgumel2/image/upload";
+        const CLOUDINARY_PRESET = "rmtimes";
+
+        const GDRIVE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKJQ0P47iQ6hBLY9hHxLiNAOyFtbatyR7WMTP517U9F85BGu1PVFuypqtj5QaxaowH/exec";
+
+        // =========================================================================
+        // 3. UTILITY HELPERS
+        // =========================================================================
+        function calculateReadTime(text) {
+            const wordsPerMinute = 200;
+            const words = text ? text.trim().split(/\s+/).length : 0;
+            return Math.ceil(words / wordsPerMinute);
+        }
+
+        function parseContributors(rawInput, myFloID) {
+            const contributors = [myFloID];
+
+            if (rawInput && rawInput.trim() !== "") {
+                const entries = rawInput.split(",").map(s => s.trim()).filter(s => s !== "");
+                const alphanumericPattern = /^[a-zA-Z0-9]+$/;
+
+                for (const entry of entries) {
+                    if (!alphanumericPattern.test(entry)) {
+                        alert(`"${entry}" is not valid — contributors must be alphanumeric only. It will be skipped.`);
+                        continue;
+                    }
+                    if (!contributors.includes(entry)) {
+                        contributors.push(entry);
+                    }
+                }
+            }
+
+            return contributors;
+        }
+
+        function logToScreen(message) {
+            const logElement = document.getElementById("logOutput");
+            logElement.style.display = "block";
+            logElement.textContent += message + "\n";
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function getMimeType(filename) {
+            const ext = (filename.match(/\.[a-zA-Z0-9]+$/) || [""])[0].toLowerCase();
+            if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+            if (ext === ".gif") return "image/gif";
+            if (ext === ".webp") return "image/webp";
+            if (ext === ".svg") return "image/svg+xml";
+            return "image/png";
+        }
+
+        function bytesToBase64(bytes) {
+            let binary = "";
+            const chunkSize = 0x8000;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+            }
+            return btoa(binary);
+        }
+
+        // =========================================================================
+        // 4. IN-BROWSER DOCX -> ARTICLE CONVERTER
+        // =========================================================================
+        const OOXML_NS = {
+            w:   "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            r:   "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            a:   "http://schemas.openxmlformats.org/drawingml/2006/main",
+            wp:  "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+            rel: "http://schemas.openxmlformats.org/package/2006/relationships",
+            dc:  "http://purl.org/dc/elements/1.1/"
+        };
+
+        const GITHUB_OWNER = "ranchimall";
+        const GITHUB_REPO = "rmtimes";
+        const GITHUB_BRANCH = "imageinsidearticle";
+        const GITHUB_REPO_IMAGE_PATH = "images";
+        const GITHUB_IMAGE_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${GITHUB_REPO_IMAGE_PATH}/`;
+        const DEFAULT_IMAGE_WIDTH = 800;
+
+        const HEURISTIC_MAX_WORDS = 12;
+        const SENTENCE_ENDINGS = [".", "!", "?", ":", ";", ","];
+        const NUMBERED_HEADING_MIN_MATCHES = 2;
+        const NUMBERED_HEADING_RE = /^\d+(\.\d+)*\.?\s+\S/;
+
+        const TABLE_STYLE_BLOCK = `<style>
+        .rmtimes-table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .rmtimes-table-wrap table {
+            width: max-content;
+            min-width: 100%;
+            table-layout: auto;
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+        }
+        .rmtimes-table-wrap th,
+        .rmtimes-table-wrap td {
+            white-space: normal;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        .rmtimes-table-wrap th {
+            background-color: #222;
+            color: white;
+            text-align: left;
+            padding: 10px;
+        }
+        .rmtimes-table-wrap td {
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+            vertical-align: top;
+        }
+        .rmtimes-table-wrap tr:nth-child(even) {
+            background-color: #f5f5f5;
+        }
+        @media (max-width: 480px) {
+            .rmtimes-table-wrap th,
+            .rmtimes-table-wrap td {
+                padding: 6px 8px;
+                font-size: 0.85rem;
+            }
+        }
+    </style>`;
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function directChildren(el, ns, local) {
+            return Array.from(el.children).filter(c => c.namespaceURI === ns && c.localName === local);
+        }
+
+        function parseXml(xmlString, label) {
+            const doc = new DOMParser().parseFromString(xmlString, "application/xml");
+            const err = doc.getElementsByTagName("parsererror")[0];
+            if (err) throw new Error(`Failed to parse ${label}: ${err.textContent.slice(0, 200)}`);
+            return doc;
+        }
+
+        function getParagraphText(pEl) {
+            let text = "";
+            (function walk(node) {
+                for (const child of node.childNodes) {
+                    if (child.nodeType !== 1) continue;
+                    const local = child.localName;
+                    if (child.namespaceURI === OOXML_NS.w && local === "t") {
+                        text += child.textContent;
+                    } else if (child.namespaceURI === OOXML_NS.w && local === "tab") {
+                        text += "\t";
+                    } else if (child.namespaceURI === OOXML_NS.w && (local === "br" || local === "cr")) {
+                        text += " ";
+                    } else {
+                        walk(child);
+                    }
+                }
+            })(pEl);
+            return text;
+        }
+
+        function looksLikeNumberedHeading(text) {
+            return NUMBERED_HEADING_RE.test(text.trim());
+        }
+
+        function looksLikeHeadingText(text) {
+            const words = text.split(/\s+/).filter(Boolean);
+            if (!words.length || words.length > HEURISTIC_MAX_WORDS) return false;
+            const trimmed = text.trim();
+            return !SENTENCE_ENDINGS.includes(trimmed.slice(-1));
+        }
+
+        // Classifies a single paragraph as a heading candidate or not. Applied to EVERY
+        // paragraph regardless of the document's overall pattern (no single "mode" gate),
+        // so a short, clean line like "Role of RanchiMall" gets picked up even in a document
+        // that otherwise uses numbered section headers.
+        //
+        // Priority order:
+        //   1. Explicit Word "Heading"/"Title" style -> always a heading (most reliable signal).
+        //   2. A full stop ANYWHERE in the paragraph -> lowest priority, never auto-suggested,
+        //      even if it also matches a numbered pattern -- a full stop usually means it's a
+        //      sentence of prose, not a title. The user can still promote it manually.
+        //   3. Matches a numbered pattern ("1.", "2.3", etc.) with no full stop -> heading.
+        //   4. Short (<= HEURISTIC_MAX_WORDS) with no trailing sentence punctuation -> heading.
+        //   5. Otherwise -> plain paragraph text.
+        function classifyParagraphHeading(p, text, isHeadingFn) {
+            if (isHeadingFn(p)) {
+                return { heading: true, reason: "style" };
+            }
+
+            const trimmed = text.trim();
+            // Split off a leading numbering prefix ("1.", "2.3", "1.2.4.") so its own dots
+            // (part of the numbering scheme, not sentence punctuation) don't count as a
+            // "full stop" -- only a full stop in the actual heading text should demote it.
+            const numberedMatch = trimmed.match(/^(\d+(?:\.\d+)*\.?)\s+(\S.*)$/);
+            const numbered = !!numberedMatch;
+            const textAfterNumber = numbered ? numberedMatch[2] : trimmed;
+            const hasFullStop = textAfterNumber.includes(".");
+
+            if (hasFullStop) {
+                return {
+                    heading: false,
+                    reason: numbered
+                        ? "numbered pattern, but contains a full stop -- low priority, please review"
+                        : "contains a full stop -- low priority"
+                };
+            }
+
+            if (numbered) {
+                return { heading: true, reason: "numbered pattern" };
+            }
+
+            if (looksLikeHeadingText(trimmed)) {
+                return { heading: true, reason: "heuristic guess" };
+            }
+
+            return { heading: false, reason: "plain text" };
+        }
+
+        function findExtent(blipEl) {
+            let node = blipEl.parentElement;
+            while (node) {
+                const extent = directChildren(node, OOXML_NS.wp, "extent")[0];
+                if (extent) return extent;
+                node = node.parentElement;
+            }
+            return null;
+        }
+
+        function renderTableBlock(tblEl) {
+            const rows = directChildren(tblEl, OOXML_NS.w, "tr");
+            const rowsHtml = rows.map((row, i) => {
+                const tag = i === 0 ? "th" : "td";
+                const cells = directChildren(row, OOXML_NS.w, "tc");
+                const cellsHtml = cells.map(cell => {
+                    const paras = directChildren(cell, OOXML_NS.w, "p");
+                    const parts = paras
+                        .map(p => getParagraphText(p).trim())
+                        .filter(Boolean)
+                        .map(escapeHtml);
+                    return `<${tag}>${parts.join("<br>")}</${tag}>`;
+                }).join("\n        ");
+                return `    <tr>\n        ${cellsHtml}\n    </tr>`;
+            });
+            const tableHtml = `<div class="rmtimes-table-wrap">\n<table>\n${rowsHtml.join("\n")}\n</table>\n</div>`;
+            return TABLE_STYLE_BLOCK + "\n" + tableHtml;
+        }
+
+        function renderContentHtml(sections) {
+            const blocksOut = [];
+            for (const section of sections) {
+                const lines = [];
+                if (section.title !== null) {
+                    lines.push(`<h3>${escapeHtml(section.title)}</h3>`);
+                    for (const block of section.blocks) {
+                        if (block.kind === "text") lines.push(`<p>${escapeHtml(block.content)}</p>`);
+                        else lines.push(`<p>${block.content}</p>`);
+                    }
+                } else {
+                    let textRun = [];
+                    const flushTextRun = () => {
+                        if (textRun.length) {
+                            const joined = textRun.join(" ").trim();
+                            if (joined) lines.push(`<p>${escapeHtml(joined)}</p>`);
+                            textRun = [];
+                        }
+                    };
+                    for (const block of section.blocks) {
+                        if (block.kind === "text") {
+                            textRun.push(block.content);
+                        } else {
+                            flushTextRun();
+                            lines.push(`<p>${block.content}</p>`);
+                        }
+                    }
+                    flushTextRun();
+                }
+                if (lines.length) blocksOut.push(lines.join("\n"));
+            }
+            return blocksOut.join("\n\n").trim();
+        }
+
+        function normalizeForCompare(text) {
+            return text.trim().replace(/\s+/g, " ").toLowerCase();
+        }
+
+        async function convertDocxFile(file) {
+            const zip = await JSZip.loadAsync(file);
+
+            const docEntry = zip.file("word/document.xml");
+            if (!docEntry) throw new Error("Not a valid .docx: word/document.xml not found.");
+            const docXml = parseXml(await docEntry.async("string"), "word/document.xml");
+
+            const relsEntry = zip.file("word/_rels/document.xml.rels");
+            const relsXml = parseXml(
+                relsEntry ? await relsEntry.async("string") : '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+                "document.xml.rels"
+            );
+
+            const stylesEntry = zip.file("word/styles.xml");
+            const stylesXml = parseXml(
+                stylesEntry ? await stylesEntry.async("string") : `<w:styles xmlns:w="${OOXML_NS.w}"/>`,
+                "styles.xml"
+            );
+
+            const coreEntry = zip.file("docProps/core.xml");
+            const coreXml = coreEntry ? parseXml(await coreEntry.async("string"), "core.xml") : null;
+
+            const styleMap = {};
+            for (const styleEl of Array.from(stylesXml.getElementsByTagNameNS(OOXML_NS.w, "style"))) {
+                if (styleEl.getAttributeNS(OOXML_NS.w, "type") !== "paragraph") continue;
+                const id = styleEl.getAttributeNS(OOXML_NS.w, "styleId");
+                const nameEl = directChildren(styleEl, OOXML_NS.w, "name")[0];
+                const nameVal = nameEl ? (nameEl.getAttributeNS(OOXML_NS.w, "val") || "").toLowerCase() : "";
+                if (id) styleMap[id] = nameVal;
+            }
+
+            function getParaStyleName(p) {
+                const pPr = directChildren(p, OOXML_NS.w, "pPr")[0];
+                if (!pPr) return "";
+                const pStyle = directChildren(pPr, OOXML_NS.w, "pStyle")[0];
+                if (!pStyle) return "";
+                const id = pStyle.getAttributeNS(OOXML_NS.w, "val");
+                return styleMap[id] || "";
+            }
+            const hasHeadingStyle = p => getParaStyleName(p).startsWith("heading");
+            const isTitleStyle = p => getParaStyleName(p) === "title";
+            const isHeading = p => hasHeadingStyle(p) || isTitleStyle(p);
+
+            const relsMap = {};
+            for (const relEl of Array.from(relsXml.getElementsByTagNameNS(OOXML_NS.rel, "Relationship"))) {
+                relsMap[relEl.getAttribute("Id")] = relEl.getAttribute("Target");
+            }
+
+            let coreTitle = "";
+            if (coreXml) {
+                const titleEls = coreXml.getElementsByTagNameNS(OOXML_NS.dc, "title");
+                if (titleEls.length) coreTitle = (titleEls[0].textContent || "").trim();
+            }
+
+            const body = docXml.getElementsByTagNameNS(OOXML_NS.w, "body")[0];
+            if (!body) throw new Error("Not a valid .docx: <w:body> not found.");
+            const bodyParagraphs = directChildren(body, OOXML_NS.w, "p");
+
+            const hasRealHeadings = bodyParagraphs.some(p => getParagraphText(p).trim() && hasHeadingStyle(p));
+            let headingMode;
+            if (hasRealHeadings) {
+                headingMode = "style";
+            } else {
+                const numberedCount = bodyParagraphs.filter(p => {
+                    const t = getParagraphText(p).trim();
+                    return t && looksLikeNumberedHeading(t);
+                }).length;
+                headingMode = numberedCount >= NUMBERED_HEADING_MIN_MATCHES ? "numbered" : "heuristic";
+            }
+
+            const docxStem = file.name.replace(/\.docx$/i, "");
+            let title = null;
+            for (const p of bodyParagraphs) {
+                const t = getParagraphText(p).trim();
+                if (t && isTitleStyle(p)) { title = t; break; }
+            }
+            if (!title) title = coreTitle || docxStem;
+
+            // flatItems: ordered, flat list of every block in the document, each tagged with
+            // how it was classified. Nothing here is "final" yet -- the UI lets the user
+            // confirm/override which paragraphs are Section titles before anything is built.
+            const flatItems = [];
+            let itemCounter = 0;
+            let imageCounter = 0;
+            const extractedImages = [];
+
+            const titleWords = normalizeForCompare(title).split(" ").filter(Boolean);
+            let titleWordsConsumed = 0;
+            let titleRepeatOpen = titleWords.length > 0;
+
+            for (const child of Array.from(body.children)) {
+                if (child.namespaceURI === OOXML_NS.w && child.localName === "p") {
+                    const p = child;
+                    const text = getParagraphText(p).trim();
+
+                    let alt = "";
+                    for (const d of Array.from(p.getElementsByTagNameNS(OOXML_NS.wp, "docPr"))) {
+                        const descr = (d.getAttribute("descr") || "").trim();
+                        if (descr) { alt = descr; break; }
+                    }
+                    if (!alt) alt = "Article image";
+
+                    for (const blip of Array.from(p.getElementsByTagNameNS(OOXML_NS.a, "blip"))) {
+                        const rId = blip.getAttributeNS(OOXML_NS.r, "embed");
+                        const target = rId ? relsMap[rId] : null;
+                        if (!target) continue;
+
+                        const zipPath = "word/" + target.replace(/^\.?\/+/, "");
+                        const imgEntry = zip.file(zipPath);
+                        if (!imgEntry) continue;
+                        const bytes = await imgEntry.async("uint8array");
+
+                        const extMatch = target.match(/\.[a-zA-Z0-9]+$/);
+                        const ext = extMatch ? extMatch[0].toLowerCase() : ".png";
+
+                        imageCounter += 1;
+                        const filename = `${docxStem}_img${imageCounter}${ext}`;
+
+                        const extentEl = findExtent(blip);
+                        let widthPx = DEFAULT_IMAGE_WIDTH;
+                        if (extentEl) {
+                            const cx = parseInt(extentEl.getAttribute("cx"), 10);
+                            if (!isNaN(cx)) widthPx = Math.round((cx / 914400) * 96);
+                        }
+                        widthPx = Math.min(widthPx, DEFAULT_IMAGE_WIDTH);
+
+                        const placeholderUrl = GITHUB_IMAGE_BASE_URL + filename;
+                        extractedImages.push({ filename, bytes, placeholderUrl });
+
+                        itemCounter += 1;
+                        flatItems.push({
+                            id: `item${itemCounter}`,
+                            kind: "image",
+                            content: `<img src="${placeholderUrl}"\n     alt="${escapeHtml(alt)}"\n     width="${widthPx}"\n     loading="lazy">`,
+                            label: `Image: ${filename}`
+                        });
+                    }
+
+                    if (!text) continue;
+
+                    if (titleRepeatOpen) {
+                        const paraWords = normalizeForCompare(text).split(" ").filter(Boolean);
+                        const n = paraWords.length;
+                        const nextChunk = titleWords.slice(titleWordsConsumed, titleWordsConsumed + n);
+                        const matchesNextChunk = n > 0 && nextChunk.length === n && nextChunk.every((w, i) => w === paraWords[i]);
+
+                        if (matchesNextChunk) {
+                            titleWordsConsumed += n;
+                            if (titleWordsConsumed >= titleWords.length) titleWordsConsumed = 0;
+                            continue;
+                        } else if (isTitleStyle(p)) {
+                            titleWordsConsumed = 0;
+                            continue;
+                        } else {
+                            titleRepeatOpen = false;
+                        }
+                    }
+
+                    let heading, reason;
+                    const classification = classifyParagraphHeading(p, text, isHeading);
+                    heading = classification.heading;
+                    reason = classification.reason;
+
+                    itemCounter += 1;
+                    flatItems.push({
+                        id: `item${itemCounter}`,
+                        kind: "paragraph",
+                        text: text,
+                        originalText: text,
+                        suggestedHeading: heading,
+                        reason: reason
+                    });
+
+                } else if (child.namespaceURI === OOXML_NS.w && child.localName === "tbl") {
+                    itemCounter += 1;
+                    flatItems.push({
+                        id: `item${itemCounter}`,
+                        kind: "table",
+                        content: renderTableBlock(child),
+                        label: "Table"
+                    });
+                }
+            }
+
+            return { title, flatItems, extractedImages, headingMode };
+        }
+
+        // Rebuilds the section/paragraph structure from the flat item list, using the
+        // user-confirmed set of paragraph ids that should act as Section titles.
+        function buildSectionsFromFlatItems(flatItems, headingIds) {
+            const sections = [];
+            let current = null;
+            function ensureCurrent() {
+                if (!current) { current = { title: null, blocks: [] }; sections.push(current); }
+                return current;
+            }
+
+            for (const item of flatItems) {
+                if (item.kind === "paragraph") {
+                    if (headingIds.has(item.id)) {
+                        current = { title: item.text, blocks: [] };
+                        sections.push(current);
+                    } else {
+                        ensureCurrent().blocks.push({ kind: "text", content: item.text });
+                    }
+                } else if (item.kind === "image") {
+                    ensureCurrent().blocks.push({ kind: "image", content: item.content });
+                } else if (item.kind === "table") {
+                    ensureCurrent().blocks.push({ kind: "table", content: item.content });
+                }
+            }
+
+            return sections;
+        }
+
+        // --- GITHUB UPLOADER (SUBADMIN MODE) ---
+        async function githubCheckSha(repoPath, token) {
+            const res = await fetch(
+                `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${repoPath}?ref=${GITHUB_BRANCH}`,
+                { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } }
+            );
+            if (res.status === 404) return null;
+            if (!res.ok) throw new Error(`GitHub check failed for ${repoPath}: ${res.status}`);
+            const data = await res.json();
+            return data.sha || null;
+        }
+
+        async function githubUploadFile(bytes, filename, token) {
+            const repoPath = `${GITHUB_REPO_IMAGE_PATH}/${filename}`;
+            const sha = await githubCheckSha(repoPath, token);
+            const body = {
+                message: `Add/update article image ${filename}`,
+                content: bytesToBase64(bytes),
+                branch: GITHUB_BRANCH
+            };
+            if (sha) body.sha = sha;
+
+            const res = await fetch(
+                `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${repoPath}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: "application/vnd.github+json",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(body)
+                }
+            );
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`${res.status} ${errText.slice(0, 200)}`);
+            }
+        }
+
+        // --- CLOUDINARY UPLOADER (GENERAL USER PRIMARY) ---
+        async function cloudinaryUploadFile(bytes, filename) {
+            const mimeType = getMimeType(filename);
+            const blob = new Blob([bytes], { type: mimeType });
+            const fd = new FormData();
+            fd.append("file", blob, filename);
+            fd.append("upload_preset", CLOUDINARY_PRESET);
+
+            const res = await fetch(CLOUDINARY_URL, {
+                method: "POST",
+                body: fd
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Cloudinary upload failed (${res.status}): ${errText.slice(0, 200)}`);
+            }
+
+            const data = await res.json();
+            if (!data.secure_url) {
+                throw new Error("Cloudinary response did not contain a secure_url.");
+            }
+            return data.secure_url;
+        }
+
+        // --- GOOGLE DRIVE / APPS SCRIPT REGISTRY & UPLOADER (GENERAL USER MODE) ---
+        async function calculateSha256Hex(bytes) {
+            const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+        }
+
+        async function processHeroImage(file) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const url = URL.createObjectURL(file);
+                img.onload = async () => {
+                    try {
+                        URL.revokeObjectURL(url);
+
+                        // 1. Center-crop & Resize to 800 x 450 px (16:9 Aspect Ratio)
+                        const mainCanvas = document.createElement("canvas");
+                        mainCanvas.width = 800;
+                        mainCanvas.height = 450;
+                        const mainCtx = mainCanvas.getContext("2d");
+
+                        const targetAspect = 800 / 450;
+                        const imgAspect = img.width / img.height;
+                        let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
+
+                        if (imgAspect > targetAspect) {
+                            sWidth = img.height * targetAspect;
+                            sx = (img.width - sWidth) / 2;
+                        } else {
+                            sHeight = img.width / targetAspect;
+                            sy = (img.height - sHeight) / 2;
+                        }
+
+                        mainCtx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, 800, 450);
+                        const mainBlob = await new Promise(res => mainCanvas.toBlob(res, "image/jpeg", 0.90));
+                        const mainBytes = new Uint8Array(await mainBlob.arrayBuffer());
+
+                        // 2. Generate Thumbnail (400 x 225 px, Guaranteed < 100 KB)
+                        const thumbCanvas = document.createElement("canvas");
+                        thumbCanvas.width = 400;
+                        thumbCanvas.height = 225;
+                        const thumbCtx = thumbCanvas.getContext("2d");
+                        thumbCtx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, 400, 225);
+
+                        let quality = 0.85;
+                        let thumbBlob = await new Promise(res => thumbCanvas.toBlob(res, "image/jpeg", quality));
+
+                        // Dynamically reduce JPEG quality if size > 100 KB (102,400 bytes)
+                        while (thumbBlob.size > 102400 && quality > 0.30) {
+                            quality -= 0.10;
+                            thumbBlob = await new Promise(res => thumbCanvas.toBlob(res, "image/jpeg", quality));
+                        }
+
+                        const thumbBytes = new Uint8Array(await thumbBlob.arrayBuffer());
+
+                        resolve({
+                            mainBytes,
+                            thumbBytes,
+                            mainSizeKb: Math.round(mainBlob.size / 1024),
+                            thumbSizeKb: Math.round(thumbBlob.size / 1024)
+                        });
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error("Failed to load hero image for processing."));
+                };
+                img.src = url;
+            });
+        }
+
+        function getLocalRegistry() {
+            try {
+                const stored = localStorage.getItem("rmtimes_image_registry");
+                return stored ? JSON.parse(stored) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveLocalRegistryEntry(hash, filename, cloudinaryUrl, gdriveUrl) {
+            try {
+                const registry = getLocalRegistry();
+                const existing = registry[hash] || {};
+                registry[hash] = {
+                    filename: filename,
+                    firstUploaded: existing.firstUploaded || new Date().toISOString(),
+                    lastReused: new Date().toISOString(),
+                    usageCount: (existing.usageCount || 1) + (existing.firstUploaded ? 1 : 0),
+                    providers: {
+                        cloudinary: cloudinaryUrl || existing.providers?.cloudinary || "",
+                        gdrive: gdriveUrl || existing.providers?.gdrive || ""
+                    }
+                };
+                localStorage.setItem("rmtimes_image_registry", JSON.stringify(registry));
+            } catch (e) {
+                console.warn("Failed to save local registry entry:", e);
+            }
+        }
+
+        async function checkGoogleDriveRegistry(imageHash) {
+            // 1. Check Local Browser Cache First
+            const localRegistry = getLocalRegistry();
+            if (localRegistry[imageHash]) {
+                const entry = localRegistry[imageHash];
+                entry.usageCount = (entry.usageCount || 1) + 1;
+                entry.lastReused = new Date().toISOString();
+                try {
+                    localStorage.setItem("rmtimes_image_registry", JSON.stringify(localRegistry));
+                } catch (e) {}
+
+                return {
+                    exists: true,
+                    source: "localCache",
+                    hash: imageHash,
+                    primaryUrl: entry.providers?.cloudinary || "",
+                    fallbackUrl: entry.providers?.gdrive || "",
+                    usageCount: entry.usageCount,
+                    providers: entry.providers
+                };
+            }
+
+            // 2. Query Google Drive Apps Script Server Registry
+            try {
+                const res = await fetch(GDRIVE_APPS_SCRIPT_URL, {
+                    method: "POST",
+                    redirect: "follow",
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8"
+                    },
+                    body: JSON.stringify({
+                        action: "checkHash",
+                        hash: imageHash
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.exists) {
+                        data.source = "serverRegistry";
+                        saveLocalRegistryEntry(imageHash, data.filename || "image", data.primaryUrl, data.fallbackUrl);
+                        return data;
+                    }
+                    if (data && data.error) {
+                        console.warn("Apps Script registry check returned error:", data.error);
+                    }
+                }
+            } catch (err) {
+                console.warn("Server registry check error:", err);
+            }
+
+            return { exists: false };
+        }
+
+        async function googleDriveAppsScriptUpload(bytes, filename, imageHash, cloudinaryUrl) {
+            const mimeType = getMimeType(filename);
+            const base64Data = bytesToBase64(bytes);
+
+            const res = await fetch(GDRIVE_APPS_SCRIPT_URL, {
+                method: "POST",
+                redirect: "follow",
+                headers: {
+                    "Content-Type": "text/plain;charset=utf-8"
+                },
+                body: JSON.stringify({
+                    action: "upload",
+                    fileName: filename,
+                    mimeType: mimeType,
+                    base64: base64Data,
+                    hash: imageHash || "",
+                    cloudinaryUrl: cloudinaryUrl || ""
+                })
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Google Drive upload failed (${res.status}): ${errText.slice(0, 200)}`);
+            }
+
+            const data = await res.json();
+            if (!data.success || !data.url) {
+                throw new Error(data.error || "Google Drive upload failed or missing URL.");
+            }
+
+            if (imageHash) {
+                saveLocalRegistryEntry(imageHash, filename, cloudinaryUrl, data.url);
+            }
+
+            return data.url;
+        }
+
+        // =========================================================================
+        // 5. FILE PICKER WIRING & PREVIEWS
+        // =========================================================================
+        let loadedArticle = null;
+        let pendingImages = [];
+        let docxStemForDownload = "article";
+
+        function setFilePickerStatus(message, state) {
+            const statusEl = document.getElementById("filePickerStatus");
+            statusEl.textContent = message;
+            statusEl.className = "file-picker-status" + (state ? ` ${state}` : "");
+        }
+
+        function triggerDownload(filename, content, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function buildPreviewHtml(title, content, readTime, sourceName) {
+            const safeTitle = escapeHtml(title);
+            const subtitle = sourceName ? `Source: ${escapeHtml(sourceName)} &nbsp;|&nbsp; ` : "";
+            return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview: ${safeTitle}</title>
+    <style>
+        :root {
+            --primary-color: #4d2588;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #212529;
+            --meta-color: #6c757d;
+            --border-color: #e9ecef;
+            --radius: 8px;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 40px 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.7;
+        }
+        .article-card {
+            max-width: 720px;
+            margin: 0 auto;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            padding: 40px 48px;
+        }
+        h1 {
+            font-size: 1.9rem;
+            color: var(--primary-color);
+            margin: 0 0 8px 0;
+            line-height: 1.3;
+        }
+        .meta {
+            font-size: 0.85rem;
+            color: var(--meta-color);
+            margin-bottom: 32px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        h3 {
+            color: var(--primary-color);
+            font-size: 1.25rem;
+            margin: 32px 0 12px 0;
+        }
+        h3:first-of-type { margin-top: 0; }
+        p {
+            margin: 0 0 16px 0;
+            font-size: 1rem;
+        }
+        p img {
+            max-width: 100%;
+            height: auto;
+            border-radius: var(--radius);
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="article-card">
+        <h1>${safeTitle}</h1>
+        <div class="meta">${subtitle}${readTime} min read</div>
+        ${content}
+    </div>
+</body>
+</html>
+`;
+        }
+
+        document.getElementById("downloadJsonBtn").addEventListener("click", () => {
+            if (!loadedArticle) return;
+            const json = JSON.stringify(loadedArticle, null, 2);
+            triggerDownload(`${docxStemForDownload}.json`, json, "application/json");
+        });
+
+        document.getElementById("downloadPreviewBtn").addEventListener("click", () => {
+            if (!loadedArticle) return;
+            const html = buildPreviewHtml(
+                loadedArticle.title, loadedArticle.content, loadedArticle.readTime,
+                docxStemForDownload + ".docx"
+            );
+            triggerDownload(`${docxStemForDownload}_preview.html`, html, "text/html");
+        });
+
+        document.getElementById("heroImageFileInput").addEventListener("change", (event) => {
+            const file = event.target.files && event.target.files[0];
+            const statusEl = document.getElementById("heroImageStatus");
+            if (file) {
+                statusEl.textContent = `Hero image: "${file.name}" selected`;
+                statusEl.className = "file-picker-status loaded";
+            } else {
+                statusEl.textContent = "No hero image selected";
+                statusEl.className = "file-picker-status";
+            }
+        });
+
+        // Holds the raw parse result awaiting user review/confirmation.
+        let pendingParse = null;
+
+        // parse.headingState: { [itemId]: boolean } -- the CURRENT (possibly user-edited)
+        // heading/paragraph decision for every paragraph item. Starts as a copy of each
+        // item's suggestedHeading and is mutated as the user toggles checkboxes.
+        function initHeadingState(parse) {
+            const state = {};
+            for (const item of parse.flatItems) {
+                if (item.kind === "paragraph") state[item.id] = item.suggestedHeading;
+            }
+            parse.headingState = state;
+            parse.editingItemId = null;
+            // Sections start collapsed by default (see isSectionCollapsed) -- resetting just
+            // clears any explicit expand/collapse overrides the user made.
+            parse.collapsedState = {};
+        }
+
+        // A section is collapsed by default; it only shows expanded once the user has
+        // explicitly clicked "Expand" for that item (collapsedState[id] === false).
+        function isSectionCollapsed(parse, itemId) {
+            return parse.collapsedState[itemId] !== false;
+        }
+
+        function renderStructureReview(parse) {
+            if (!parse.headingState) initHeadingState(parse);
+            document.getElementById("reviewTitleInput").value = parse.title;
+            renderGroupedStructureList(parse);
+            document.getElementById("structureReview").style.display = "block";
+            setStructureEditBodyVisible(true);
+            document.getElementById("toggleStructureEditBtn").style.display = "none";
+            clearStructureConfirmStatus();
+        }
+
+        // Builds a checkbox row for a single paragraph item (used both as a Section header
+        // row and as a plain content row -- same control, different current state).
+        // Section header rows also get an "Edit" button to rename the section inline.
+        function buildParagraphRow(parse, item, isSectionHeader) {
+            const row = document.createElement("div");
+            row.className = "structure-item" + (isSectionHeader ? " is-heading" : "");
+            row.dataset.itemId = item.id;
+
+            const checkboxWrap = document.createElement("div");
+            checkboxWrap.className = "structure-item-checkbox-wrap";
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = isSectionHeader;
+            checkbox.dataset.itemId = item.id;
+            checkbox.title = "Treat as a Section title";
+            checkbox.addEventListener("change", () => {
+                parse.headingState[item.id] = checkbox.checked;
+                renderGroupedStructureList(parse); // re-group live so the flow updates immediately
+                clearStructureConfirmStatus(); // structure changed -- previous confirmation no longer applies
+            });
+            checkboxWrap.appendChild(checkbox);
+
+            const body = document.createElement("div");
+            body.className = "structure-item-body";
+
+            const isEditing = parse.editingItemId === item.id;
+
+            if (isEditing) {
+                const editInput = document.createElement("input");
+                editInput.type = "text";
+                editInput.className = "structure-item-edit-input";
+                editInput.value = item.text;
+
+                const saveEdit = () => {
+                    const newVal = editInput.value.trim();
+                    if (newVal) item.text = newVal;
+                    parse.editingItemId = null;
+                    renderGroupedStructureList(parse);
+                    clearStructureConfirmStatus();
+                };
+                const cancelEdit = () => {
+                    parse.editingItemId = null;
+                    renderGroupedStructureList(parse);
+                };
+
+                editInput.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") { e.preventDefault(); saveEdit(); }
+                    else if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
+                });
+
+                const editActions = document.createElement("div");
+                editActions.className = "structure-item-edit-actions";
+                const saveBtn = document.createElement("button");
+                saveBtn.type = "button";
+                saveBtn.className = "btn-secondary";
+                saveBtn.textContent = "Save";
+                saveBtn.addEventListener("click", saveEdit);
+                const cancelBtn = document.createElement("button");
+                cancelBtn.type = "button";
+                cancelBtn.className = "btn-secondary";
+                cancelBtn.textContent = "Cancel";
+                cancelBtn.addEventListener("click", cancelEdit);
+                editActions.appendChild(saveBtn);
+                editActions.appendChild(cancelBtn);
+
+                body.appendChild(editInput);
+                body.appendChild(editActions);
+
+                row.appendChild(checkboxWrap);
+                row.appendChild(body);
+
+                // Auto-focus once the input is in the DOM.
+                setTimeout(() => { editInput.focus(); editInput.select(); }, 0);
+
+                return row;
+            }
+
+            const textEl = document.createElement("div");
+            textEl.className = "structure-item-text";
+            textEl.textContent = item.text;
+            const badge = document.createElement("div");
+            badge.className = "structure-item-badge";
+            badge.textContent = isSectionHeader ? "Section title" : "Paragraph";
+            body.appendChild(textEl);
+            body.appendChild(badge);
+
+            row.appendChild(checkboxWrap);
+            row.appendChild(body);
+
+            if (isSectionHeader) {
+                const actionsWrap = document.createElement("div");
+                actionsWrap.className = "structure-header-actions";
+
+                const editBtn = document.createElement("button");
+                editBtn.type = "button";
+                editBtn.className = "btn-secondary structure-edit-btn";
+                editBtn.textContent = "Edit";
+                editBtn.title = "Edit this Section title";
+                editBtn.addEventListener("click", () => {
+                    parse.editingItemId = item.id;
+                    renderGroupedStructureList(parse);
+                });
+                actionsWrap.appendChild(editBtn);
+
+                const collapsed = isSectionCollapsed(parse, item.id);
+                const collapseBtn = document.createElement("button");
+                collapseBtn.type = "button";
+                collapseBtn.className = "btn-secondary structure-collapse-btn";
+                collapseBtn.textContent = collapsed ? "Expand" : "Collapse";
+                collapseBtn.title = collapsed
+                    ? "Show this section's paragraphs"
+                    : "Hide this section's paragraphs (nothing is deleted)";
+                collapseBtn.addEventListener("click", () => {
+                    parse.collapsedState[item.id] = !collapsed;
+                    renderGroupedStructureList(parse);
+                });
+                actionsWrap.appendChild(collapseBtn);
+
+                row.appendChild(actionsWrap);
+            }
+
+            return row;
+        }
+
+        function buildNonToggleRow(item) {
+            const row = document.createElement("div");
+            row.className = "structure-item non-toggle";
+            const body = document.createElement("div");
+            body.className = "structure-item-body";
+            body.textContent = item.kind === "image" ? `🖼 ${item.label}` : `▦ ${item.label}`;
+            row.appendChild(body);
+            return row;
+        }
+
+        // Re-renders the review list grouped as: [Intro before Section 1 (if any)],
+        // Section 1 (+ its content), Section 2 (+ its content), ... -- recomputed from
+        // parse.headingState every time, so checking/unchecking a box instantly moves
+        // items between sections and renumbers them.
+        function renderGroupedStructureList(parse) {
+            const listEl = document.getElementById("structureList");
+            const scrollTop = listEl.scrollTop;
+            listEl.innerHTML = "";
+
+            let sectionCount = 0;
+            let currentBody = null;
+
+            function startIntroGroupIfNeeded() {
+                if (currentBody) return currentBody;
+                const card = document.createElement("div");
+                card.className = "structure-section-card structure-intro-card";
+                const header = document.createElement("div");
+                header.className = "structure-section-label";
+                header.textContent = "Before Section 1 (no heading yet)";
+                card.appendChild(header);
+                const body = document.createElement("div");
+                body.className = "structure-section-body";
+                card.appendChild(body);
+                listEl.appendChild(card);
+                currentBody = body;
+                return currentBody;
+            }
+
+            for (const item of parse.flatItems) {
+                if (item.kind === "paragraph") {
+                    const isSectionHeader = !!parse.headingState[item.id];
+                    if (isSectionHeader) {
+                        sectionCount += 1;
+                        const card = document.createElement("div");
+                        card.className = "structure-section-card";
+                        const label = document.createElement("div");
+                        label.className = "structure-section-label";
+                        label.textContent = `Section ${sectionCount}`;
+                        card.appendChild(label);
+                        card.appendChild(buildParagraphRow(parse, item, true));
+                        const body = document.createElement("div");
+                        body.className = "structure-section-body";
+
+                        if (isSectionCollapsed(parse, item.id)) {
+                            card.classList.add("is-collapsed");
+                            body.style.display = "none";
+                        }
+
+                        card.appendChild(body);
+                        listEl.appendChild(card);
+                        currentBody = body;
+                    } else {
+                        startIntroGroupIfNeeded().appendChild(buildParagraphRow(parse, item, false));
+                    }
+                } else {
+                    startIntroGroupIfNeeded().appendChild(buildNonToggleRow(item));
+                }
+            }
+
+            if (!listEl.children.length) {
+                const empty = document.createElement("div");
+                empty.className = "structure-item non-toggle";
+                empty.textContent = "No content found in this document.";
+                listEl.appendChild(empty);
+            }
+
+            listEl.scrollTop = scrollTop;
+        }
+
+        document.getElementById("collapseAllBtn").addEventListener("click", () => {
+            if (!pendingParse) return;
+            for (const id of Object.keys(pendingParse.headingState)) {
+                if (pendingParse.headingState[id]) pendingParse.collapsedState[id] = true;
+            }
+            renderGroupedStructureList(pendingParse);
+        });
+
+        document.getElementById("expandAllBtn").addEventListener("click", () => {
+            if (!pendingParse) return;
+            for (const id of Object.keys(pendingParse.headingState)) {
+                if (pendingParse.headingState[id]) pendingParse.collapsedState[id] = false;
+            }
+            renderGroupedStructureList(pendingParse);
+        });
+
+        function isStructureFullscreen() {
+            const el = document.getElementById("structureReview");
+            return !!(el && el.classList.contains("is-fullscreen"));
+        }
+
+        function setStructureFullscreen(enable) {
+            const el = document.getElementById("structureReview");
+            const icon = document.getElementById("fullscreenIcon");
+            const text = document.getElementById("fullscreenText");
+            const btn = document.getElementById("toggleFullscreenBtn");
+            if (!el) return;
+
+            if (enable) {
+                // Ensure edit body is visible if entering fullscreen
+                setStructureEditBodyVisible(true);
+                el.classList.add("is-fullscreen");
+                document.body.style.overflow = "hidden";
+                if (icon) icon.textContent = "✕";
+                if (text) text.textContent = "Exit Fullscreen";
+                if (btn) btn.title = "Exit Fullscreen (Esc)";
+            } else {
+                el.classList.remove("is-fullscreen");
+                document.body.style.overflow = "";
+                if (icon) icon.textContent = "⛶";
+                if (text) text.textContent = "Fullscreen View";
+                if (btn) btn.title = "Toggle Fullscreen View (Esc to exit)";
+            }
+        }
+
+        document.getElementById("toggleFullscreenBtn").addEventListener("click", () => {
+            setStructureFullscreen(!isStructureFullscreen());
+        });
+
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && isStructureFullscreen()) {
+                // If user is actively typing in an item input, let item edit cancel handle it first
+                if (!pendingParse || !pendingParse.editingItemId) {
+                    setStructureFullscreen(false);
+                }
+            }
+        });
+
+        function clearStructureConfirmStatus() {
+            const confirmStatusEl = document.getElementById("structureConfirmStatus");
+            if (confirmStatusEl) {
+                confirmStatusEl.textContent = "";
+                confirmStatusEl.className = "file-picker-status";
+                confirmStatusEl.style.display = "none";
+            }
+        }
+
+        function setStructureEditBodyVisible(visible) {
+            const editBody = document.getElementById("structureEditBody");
+            const toggleBtn = document.getElementById("toggleStructureEditBtn");
+            if (!editBody || !toggleBtn) return;
+            if (!visible && isStructureFullscreen()) {
+                setStructureFullscreen(false);
+            }
+            editBody.style.display = visible ? "block" : "none";
+            toggleBtn.textContent = visible ? "Hide Section Panel" : "Review / Edit Sections";
+        }
+
+        document.getElementById("toggleStructureEditBtn").addEventListener("click", () => {
+            const editBody = document.getElementById("structureEditBody");
+            const isCurrentlyHidden = editBody.style.display === "none";
+            setStructureEditBodyVisible(isCurrentlyHidden);
+        });
+
+        document.getElementById("resetStructureBtn").addEventListener("click", () => {
+            if (!pendingParse) return;
+            for (const item of pendingParse.flatItems) {
+                if (item.kind === "paragraph") item.text = item.originalText;
+            }
+            initHeadingState(pendingParse);
+            renderGroupedStructureList(pendingParse);
+            clearStructureConfirmStatus();
+        });
+
+        document.getElementById("confirmStructureBtn").addEventListener("click", () => {
+            if (!pendingParse) return;
+
+            if (isStructureFullscreen()) {
+                setStructureFullscreen(false);
+            }
+
+            const headingIds = new Set(
+                Object.keys(pendingParse.headingState).filter(id => pendingParse.headingState[id])
+            );
+
+            const finalTitle = (document.getElementById("reviewTitleInput").value || "").trim() || pendingParse.title;
+            const sections = buildSectionsFromFlatItems(pendingParse.flatItems, headingIds);
+            const content = renderContentHtml(sections);
+            const readTime = calculateReadTime(content);
+
+            const cleanContent = typeof DOMPurify !== 'undefined'
+                ? DOMPurify.sanitize(content, { FORBID_ATTR: ['style'], ADD_ATTR: ['target', 'data-backup', 'onerror'] })
+                : content;
+
+            loadedArticle = { title: finalTitle, content: cleanContent, readTime: readTime };
+            pendingImages = pendingParse.extractedImages;
+            document.getElementById("downloadActions").style.display = "flex";
+
+            const sectionCount = sections.filter(s => s.title !== null).length;
+            const imgNote = pendingImages.length ? `, ${pendingImages.length} image(s) to upload` : "";
+            const confirmMessage = `Confirmed "${loadedArticle.title}" -- ${sectionCount} section(s), ${loadedArticle.readTime} min read${imgNote}`;
+
+            setFilePickerStatus(confirmMessage, "loaded");
+
+            // Show feedback right next to the button the user is actually looking at,
+            // instead of only updating the status text near the top of the page.
+            const confirmStatusEl = document.getElementById("structureConfirmStatus");
+            confirmStatusEl.textContent = `\u2713 ${confirmMessage}. You can now click "Start Direct Creator & Publish" below.`;
+            confirmStatusEl.className = "file-picker-status loaded";
+            confirmStatusEl.style.display = "block";
+
+            // Collapse the checklist now that it's confirmed, so the page doesn't stay
+            // cluttered with a long list the user no longer needs to act on. The panel
+            // can still be reopened via the "Review / Edit Sections" button below.
+            setStructureEditBodyVisible(false);
+            const toggleBtn = document.getElementById("toggleStructureEditBtn");
+            toggleBtn.style.display = "inline-block";
+
+            confirmStatusEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+
+        document.getElementById("articleFileInput").addEventListener("change", async (event) => {
+            const file = event.target.files && event.target.files[0];
+            loadedArticle = null;
+            pendingImages = [];
+            pendingParse = null;
+            setStructureFullscreen(false);
+            document.getElementById("downloadActions").style.display = "none";
+            document.getElementById("structureReview").style.display = "none";
+
+            if (!file) {
+                setFilePickerStatus("No file selected");
+                return;
+            }
+
+            docxStemForDownload = file.name.replace(/\.docx$/i, "");
+            setFilePickerStatus(`Parsing "${file.name}"...`);
+
+            try {
+                const result = await convertDocxFile(file);
+                pendingParse = result;
+                renderStructureReview(result);
+
+                let note = "";
+                if (result.headingMode === "numbered") note = " [numbered-heading pattern used -- please review]";
+                else if (result.headingMode === "heuristic") note = " [WARNING: headings guessed heuristically -- please review]";
+
+                setFilePickerStatus(
+                    `Parsed "${file.name}"${note}. Review the structure below and confirm before publishing.`,
+                    result.headingMode === "heuristic" ? "error" : "loaded"
+                );
+            } catch (err) {
+                console.error("Failed to parse docx:", err);
+                setFilePickerStatus(`Error: ${err.message || "Could not parse .docx file"}`, "error");
+            }
+        });
+
+        // =========================================================================
+        // 6. MAIN DIRECT PUBLISHING PROCESS (WITH RUNTIME DUAL FALLBACK)
+        // =========================================================================
+        async function publishDirectUserContent() {
+            try {
+                document.getElementById("logOutput").textContent = "";
+
+                // Step 1: Article JSON must already be loaded via the file picker
+                if (!loadedArticle) {
+                    logToScreen("[System] Publishing canceled: no valid article file selected.");
+                    alert("Please choose a valid article .docx file first.");
+                    return;
+                }
+                const { title: articleTitle, readTime } = loadedArticle;
+                let articleContent = loadedArticle.content;
+                logToScreen(`[System] Using loaded article: "${articleTitle}" (${readTime} min read)`);
+
+                // Step 2: Determine Role Mode & Prompt for Key
+                const selectedRole = document.querySelector('input[name="publisherRole"]:checked').value;
+                const isSubadminRole = selectedRole === "subadmin";
+
+                const keyPromptText = isSubadminRole 
+                    ? "Enter Subadmin Private Key (WIF):" 
+                    : "Enter your General FLO Private Key (WIF):";
+
+                const myPrivKey = prompt(keyPromptText);
+                if (!myPrivKey) {
+                    logToScreen("[System] Publishing canceled: Private Key is required.");
+                    return;
+                }
+
+                const myFloID = floCrypto.getAddress(myPrivKey);
+                if (!myFloID) {
+                    logToScreen("[Error] Could not derive FLO Address from WIF.");
+                    alert("Invalid Private Key format. Please try again.");
+                    return;
+                }
+
+                logToScreen(`[System] Role: ${isSubadminRole ? "Subadmin (GitHub Storage)" : "General User (Cloudinary + Google Drive Dual Upload)"}`);
+                logToScreen(`[System] Derived FLO Address: ${myFloID}`);
+
+                // Authenticate user session
+                floCloudAPI.user(myFloID, myPrivKey);
+                floGlobals.myFloID = myFloID;
+
+                // Step 3: Contributors
+                const contributorsInput = prompt(
+                    "Enter additional Contributors (comma-separated, alphanumeric only). Leave blank if none:",
+                    ""
+                );
+                const contributors = parseContributors(contributorsInput, myFloID);
+                logToScreen(`[System] Contributors: ${contributors.join(", ")}`);
+
+                // Step 4: Handle Image Uploads based on Role
+                if (pendingImages.length > 0) {
+                    if (isSubadminRole) {
+                        // SUBADMIN MODE: Upload to GitHub repo
+                        const githubToken = prompt(
+                            `This article has ${pendingImages.length} image(s) to upload to GitHub ` +
+                            `(${GITHUB_OWNER}/${GITHUB_REPO}@${GITHUB_BRANCH}/${GITHUB_REPO_IMAGE_PATH}). ` +
+                            `Enter a GitHub token with 'contents: write' access:`
+                        );
+
+                        if (!githubToken) {
+                            const proceedAnyway = confirm(
+                                "No GitHub token entered -- images will NOT be uploaded and their links " +
+                                "will be broken in the published article. Publish anyway?"
+                            );
+                            if (!proceedAnyway) {
+                                logToScreen("[System] Publishing canceled: GitHub token not provided.");
+                                return;
+                            }
+                            logToScreen("[Warning] Skipping GitHub image upload; image links may be broken.");
+                        } else {
+                            logToScreen(`[System] Processing ${pendingImages.length} image(s) for GitHub...`);
+                            let failures = 0;
+                            for (const img of pendingImages) {
+                                try {
+                                    const repoPath = `${GITHUB_REPO_IMAGE_PATH}/${img.filename}`;
+                                    const sha = await githubCheckSha(repoPath, githubToken);
+                                    if (sha) {
+                                        logToScreen(`  [SKIPPED UPLOAD] File "${img.filename}" already exists on GitHub (SHA: ${sha.slice(0, 7)}). Reusing existing URL.`);
+                                    } else {
+                                        await githubUploadFile(img.bytes, img.filename, githubToken);
+                                        logToScreen(`  Uploaded to GitHub: ${GITHUB_REPO_IMAGE_PATH}/${img.filename}`);
+                                    }
+                                } catch (err) {
+                                    failures += 1;
+                                    logToScreen(`  [ERROR] GitHub upload failed for ${img.filename}: ${err.message}`);
+                                }
+                            }
+                            if (failures > 0) {
+                                const proceedAnyway = confirm(
+                                    `${failures} of ${pendingImages.length} image(s) failed to upload to GitHub. ` +
+                                    `Publish anyway (those image links will be broken)?`
+                                );
+                                if (!proceedAnyway) {
+                                    logToScreen("[System] Publishing canceled after GitHub image upload failures.");
+                                    return;
+                                }
+                            }
+                        }
+                    } else {
+                        // GENERAL USER MODE: Registry-based Dual Upload (Cloudinary + Google Drive)
+                        logToScreen(`[System] Processing ${pendingImages.length} image(s) (Cloudinary + Google Drive Registry)...`);
+                        let failures = 0;
+
+                        for (const img of pendingImages) {
+                            try {
+                                const imageHash = await calculateSha256Hex(img.bytes);
+                                logToScreen(`  [Checking Registry] ${img.filename} (Hash: ${imageHash.slice(0, 12)}...)`);
+
+                                let registryResult = null;
+                                try {
+                                    registryResult = await checkGoogleDriveRegistry(imageHash);
+                                } catch (checkErr) {
+                                    console.warn("Registry lookup error:", checkErr);
+                                }
+
+                                if (registryResult && registryResult.exists) {
+                                    const primaryUrl = registryResult.primaryUrl || (registryResult.providers && registryResult.providers.cloudinary) || "";
+                                    const fallbackUrl = registryResult.fallbackUrl || (registryResult.providers && registryResult.providers.gdrive) || "";
+                                    const usageCount = registryResult.usageCount || 2;
+
+                                    logToScreen(`  [SKIPPED UPLOAD] Duplicate image detected for "${img.filename}":`);
+                                    if (primaryUrl) logToScreen(`    ├─ Reused Primary (Cloudinary): ${primaryUrl}`);
+                                    if (fallbackUrl) logToScreen(`    ├─ Reused Fallback (Google Drive): ${fallbackUrl}`);
+                                    logToScreen(`    └─ Total Usage Count: ${usageCount}`);
+
+                                    if (primaryUrl && fallbackUrl) {
+                                        const replacement = `${primaryUrl}" data-backup="${fallbackUrl}" onerror="this.onerror=null;if(this.dataset.backup){this.src=this.dataset.backup;}`;
+                                        articleContent = articleContent.replaceAll(img.placeholderUrl, replacement);
+                                    } else if (primaryUrl) {
+                                        articleContent = articleContent.replaceAll(img.placeholderUrl, primaryUrl);
+                                    } else if (fallbackUrl) {
+                                        articleContent = articleContent.replaceAll(img.placeholderUrl, fallbackUrl);
+                                    }
+                                    continue;
+                                }
+
+                                // Hash not found in registry -- upload to Cloudinary first, then Google Drive
+                                let cloudinaryUrl = null;
+                                let gdriveUrl = null;
+
+                                // 1. Upload to Cloudinary
+                                try {
+                                    cloudinaryUrl = await cloudinaryUploadFile(img.bytes, img.filename);
+                                    logToScreen(`    [1/2] Cloudinary upload successful: ${cloudinaryUrl}`);
+                                } catch (err) {
+                                    logToScreen(`    [WARNING] Cloudinary upload failed for ${img.filename}: ${err.message}`);
+                                }
+
+                                // 2. Upload to Google Drive via Google Apps Script (passing hash + cloudinaryUrl for registry)
+                                try {
+                                    gdriveUrl = await googleDriveAppsScriptUpload(img.bytes, img.filename, imageHash, cloudinaryUrl);
+                                    logToScreen(`    [2/2] Google Drive upload & registry update successful: ${gdriveUrl}`);
+                                } catch (err) {
+                                    logToScreen(`    [WARNING] Google Drive upload failed for ${img.filename}: ${err.message}`);
+                                }
+
+                                // Handle runtime fallback if both Cloudinary and Google Drive succeeded
+                                if (cloudinaryUrl && gdriveUrl) {
+                                    const replacement = `${cloudinaryUrl}" data-backup="${gdriveUrl}" onerror="this.onerror=null;if(this.dataset.backup){this.src=this.dataset.backup;}`;
+                                    articleContent = articleContent.replaceAll(img.placeholderUrl, replacement);
+                                } else if (cloudinaryUrl) {
+                                    articleContent = articleContent.replaceAll(img.placeholderUrl, cloudinaryUrl);
+                                } else if (gdriveUrl) {
+                                    articleContent = articleContent.replaceAll(img.placeholderUrl, gdriveUrl);
+                                } else {
+                                    failures += 1;
+                                    logToScreen(`    [ERROR] Both Cloudinary and Google Drive uploads failed for ${img.filename}`);
+                                }
+                            } catch (imgErr) {
+                                failures += 1;
+                                logToScreen(`    [ERROR] Failed to process image ${img.filename}: ${imgErr.message}`);
+                            }
+                        }
+
+                        if (failures > 0) {
+                            const proceedAnyway = confirm(
+                                `${failures} of ${pendingImages.length} image(s) failed to upload to both Cloudinary and Google Drive. ` +
+                                `Publish anyway?`
+                            );
+                            if (!proceedAnyway) {
+                                logToScreen("[System] Publishing canceled after image upload failures.");
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                // Handle Optional Hero Image Upload (Resized 800x450 + <100KB Thumbnail)
+                let uploadedHeroImage = null;
+                const heroInput = document.getElementById("heroImageFileInput");
+                const heroFile = heroInput && heroInput.files && heroInput.files[0];
+
+                if (heroFile) {
+                    logToScreen(`[System] Resizing & Processing Hero Image: "${heroFile.name}"...`);
+                    try {
+                        const { mainBytes, thumbBytes, mainSizeKb, thumbSizeKb } = await processHeroImage(heroFile);
+                        logToScreen(`  ├─ Resized Main Image: 800x450 px (${mainSizeKb} KB)`);
+                        logToScreen(`  └─ Generated Thumbnail: 400x225 px (${thumbSizeKb} KB - <100KB target)`);
+
+                        const mainHash = await calculateSha256Hex(mainBytes);
+                        const thumbHash = await calculateSha256Hex(thumbBytes);
+
+                        const stem = heroFile.name.replace(/\.[^/.]+$/, "").replace(/\s+/g, '_');
+                        const mainFilename = `hero_${stem}_800x450.jpg`;
+                        const thumbFilename = `hero_${stem}_thumb.jpg`;
+
+                        let mainCloudinaryUrl = "", mainGdriveUrl = "";
+                        let thumbCloudinaryUrl = "", thumbGdriveUrl = "";
+
+                        if (isSubadminRole) {
+                            const githubToken = prompt("Enter GitHub token to upload Hero Image to GitHub repository:");
+                            if (githubToken) {
+                                // Upload main 800x450
+                                const mainRepoPath = `${GITHUB_REPO_IMAGE_PATH}/${mainFilename}`;
+                                if (!await githubCheckSha(mainRepoPath, githubToken)) {
+                                    await githubUploadFile(mainBytes, mainFilename, githubToken);
+                                }
+                                mainCloudinaryUrl = GITHUB_IMAGE_BASE_URL + mainFilename;
+                                mainGdriveUrl = mainCloudinaryUrl;
+
+                                // Upload thumbnail <100KB
+                                const thumbRepoPath = `${GITHUB_REPO_IMAGE_PATH}/${thumbFilename}`;
+                                if (!await githubCheckSha(thumbRepoPath, githubToken)) {
+                                    await githubUploadFile(thumbBytes, thumbFilename, githubToken);
+                                }
+                                thumbCloudinaryUrl = GITHUB_IMAGE_BASE_URL + thumbFilename;
+                                thumbGdriveUrl = thumbCloudinaryUrl;
+
+                                logToScreen(`  [Hero Image] Main & Thumbnail uploaded to GitHub repository.`);
+                            }
+                        } else {
+                            // General User Dual Upload: Main 800x450
+                            const mainReg = await checkGoogleDriveRegistry(mainHash);
+                            if (mainReg && mainReg.exists) {
+                                mainCloudinaryUrl = mainReg.primaryUrl || (mainReg.providers && mainReg.providers.cloudinary) || "";
+                                mainGdriveUrl = mainReg.fallbackUrl || (mainReg.providers && mainReg.providers.gdrive) || "";
+                                logToScreen(`  [Main Hero Image] Reused existing registry URLs.`);
+                            } else {
+                                mainCloudinaryUrl = await cloudinaryUploadFile(mainBytes, mainFilename);
+                                mainGdriveUrl = await googleDriveAppsScriptUpload(mainBytes, mainFilename, mainHash, mainCloudinaryUrl);
+                                logToScreen(`  [Main Hero Image Uploaded] 800x450 px (${mainSizeKb} KB)`);
+                            }
+
+                            // General User Dual Upload: Thumbnail <100KB
+                            const thumbReg = await checkGoogleDriveRegistry(thumbHash);
+                            if (thumbReg && thumbReg.exists) {
+                                thumbCloudinaryUrl = thumbReg.primaryUrl || (thumbReg.providers && thumbReg.providers.cloudinary) || "";
+                                thumbGdriveUrl = thumbReg.fallbackUrl || (thumbReg.providers && thumbReg.providers.gdrive) || "";
+                                logToScreen(`  [Hero Thumbnail] Reused existing registry URLs.`);
+                            } else {
+                                thumbCloudinaryUrl = await cloudinaryUploadFile(thumbBytes, thumbFilename);
+                                thumbGdriveUrl = await googleDriveAppsScriptUpload(thumbBytes, thumbFilename, thumbHash, thumbCloudinaryUrl);
+                                logToScreen(`  [Hero Thumbnail Uploaded] 400x225 px (${thumbSizeKb} KB - <100KB)`);
+                            }
+                        }
+
+                        uploadedHeroImage = {
+                            cloudinaryUrl: mainCloudinaryUrl,
+                            gdriveUrl: mainGdriveUrl,
+                            filename: mainFilename,
+                            thumbnailCloudinaryUrl: thumbCloudinaryUrl,
+                            thumbnailGdriveUrl: thumbGdriveUrl,
+                            thumbnailFilename: thumbFilename,
+                            thumbSizeKb: thumbSizeKb
+                        };
+                    } catch (heroErr) {
+                        logToScreen(`  [WARNING] Hero image processing failed: ${heroErr.message}`);
+                    }
+                }
+
+                logToScreen(`[Loaded Article Content]:\n${articleContent}\n`);
+
+                // Step 5: Initialize SuperNodes
+                logToScreen("[System] Initializing SuperNodes...");
+                await floCloudAPI.init(supernodesList);
+
+                // Step 6: Construct Payload & Dispatch Request via sendGeneralData
+                const articleID = floCrypto.randString(16, true);
+                logToScreen("[System] Dispatching request to RanchiMall Times...");
+                
+                const payload = {
+                    articleID: articleID,
+                    title: articleTitle,
+                    content: articleContent,
+                    readTime: readTime,
+                    contributors: contributors
+                };
+                if (uploadedHeroImage) {
+                    payload.heroImage = uploadedHeroImage;
+                }
+
+                return floCloudAPI.sendGeneralData(payload, 'publishing_requests', {
+                    application: 'RM_Times',
+                    receiverID: 'FF5pewfsJxyrCvg8a2C8VXefeyVvKvQxmF'
+                })
+                .then(res => {
+                    console.log("Publication response:", res);
+                    logToScreen("[System] Result:\n" + JSON.stringify(res, null, 2));
+                    alert("Publication request submitted successfully!");
+                    return res;
+                })
+                .catch(err => {
+                    console.error("Publication error:", err);
+                    logToScreen("[Error] " + (err.message || JSON.stringify(err)));
+                    alert("Publication request failed.");
+                });
+
+            } catch (err) {
+                console.error("Failed to execute publishing routine:", err);
+                logToScreen("[Error] " + (err.message || JSON.stringify(err)));
+            }
+        }
+    </script>
+</body>
+</html>
