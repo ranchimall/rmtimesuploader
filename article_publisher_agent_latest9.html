@@ -1,0 +1,3794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RM Times - Publishing Studio</title>
+    
+    <!-- floGlobals MUST be defined before floCloudAPI.js loads -->
+    <script>
+        const globalScope = typeof window !== 'undefined' ? window : global;
+        globalScope.floGlobals = globalScope.floGlobals || {};
+        floGlobals.SNStorageID = floGlobals.SNStorageID || "FNaN9McoBAEFUjkRmNQRYLmBF8SpS7Tgfk";
+        floGlobals.adminID = floGlobals.adminID || "FNaN9McoBAEFUjkRmNQRYLmBF8SpS7Tgfk";
+        floGlobals.application = floGlobals.application || "RM_Times";
+        floGlobals.subAdmins = floGlobals.subAdmins || [];
+        floGlobals.settings = floGlobals.settings || {};
+    </script>
+
+    <!-- External Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://ranchimall.github.io/cc/scripts/lib.js"></script>
+    <script src="https://ranchimall.github.io/cc/scripts/floCrypto.js"></script>
+    <script src="https://ranchimall.github.io/cc/scripts/floCloudAPI.js"></script>
+
+    <style>
+        :root {
+            --primary: #4d2588;
+            --primary-hover: #3b196c;
+            --primary-light: #f3effa;
+            --primary-border: #d4c5ed;
+            --accent: #7a40ce;
+            --bg-page: #f8f9fc;
+            --bg-surface: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --border-hover: #cbd5e1;
+            --success: #10b981;
+            --success-light: #ecfdf5;
+            --warning: #f59e0b;
+            --warning-light: #fffbeb;
+            --error: #ef4444;
+            --error-light: #fef2f2;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 16px;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+            --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+        }
+
+        html, body {
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-main);
+        }
+
+        body {
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- TOP HEADER --- */
+        .app-header {
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow-sm);
+            width: 100%;
+            gap: 10px;
+            box-sizing: border-box;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .brand-logo {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: #ffffff;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.1rem;
+            letter-spacing: -0.5px;
+            box-shadow: 0 2px 8px rgba(77, 37, 136, 0.3);
+            flex-shrink: 0;
+        }
+
+        .brand-text {
+            min-width: 0;
+        }
+
+        .brand-text h1 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--primary);
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .brand-text p {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .btn-header {
+            background: var(--bg-page);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 6px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .btn-header:hover {
+            background: #ffffff;
+            border-color: var(--primary-border);
+            color: var(--primary);
+        }
+
+        /* --- STEPPER BAR --- */
+        .stepper-container {
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .stepper {
+            display: flex;
+            align-items: center;
+            max-width: 800px;
+            width: 100%;
+            position: relative;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            cursor: pointer;
+            opacity: 0.55;
+            transition: all 0.25s ease;
+            min-width: 0;
+        }
+
+        .step-item.active {
+            opacity: 1;
+        }
+
+        .step-item.completed {
+            opacity: 0.9;
+        }
+
+        .step-number {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--bg-page);
+            border: 2px solid var(--border);
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.82rem;
+            font-weight: 700;
+            flex-shrink: 0;
+            transition: all 0.25s ease;
+        }
+
+        .step-item.active .step-number {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #ffffff;
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .step-item.completed .step-number {
+            background: var(--success);
+            border-color: var(--success);
+            color: #ffffff;
+        }
+
+        .step-info {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .step-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .step-desc {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .step-divider {
+            height: 2px;
+            background: var(--border);
+            flex: 1 1 20px;
+            margin: 0 10px;
+            min-width: 8px;
+        }
+
+        /* --- MAIN VIEW CONTAINER --- */
+        .main-wrapper {
+            flex: 1;
+            padding: 20px 24px;
+            max-width: 1440px;
+            margin: 0 auto;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        /* --- STEP 1: INGESTION STAGE & TABS --- */
+        .upload-stage {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 16px;
+            max-width: 760px;
+            margin: 10px auto;
+            width: 100%;
+        }
+
+        .input-mode-tabs {
+            display: flex;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 4px;
+            margin-bottom: 20px;
+            gap: 4px;
+            width: 100%;
+            max-width: 440px;
+        }
+
+        .mode-tab {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .mode-tab.active {
+            background: var(--primary);
+            color: #ffffff;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .dropzone {
+            width: 100%;
+            border: 2px dashed var(--primary-border);
+            background: var(--bg-surface);
+            border-radius: var(--radius-lg);
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .dropzone:hover, .dropzone.dragover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .dropzone-icon {
+            width: 56px;
+            height: 56px;
+            background: var(--primary-light);
+            color: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            margin-bottom: 14px;
+        }
+
+        .dropzone-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 6px;
+        }
+
+        .dropzone-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 18px;
+        }
+
+        .dropzone-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .dropzone-badge {
+            background: var(--bg-page);
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        /* Paste Text Card */
+        .paste-text-card {
+            width: 100%;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .raw-text-area {
+            width: 100%;
+            min-height: 240px;
+            padding: 12px 14px;
+            font-size: 0.92rem;
+            line-height: 1.6;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            outline: none;
+            resize: vertical;
+            transition: all 0.2s;
+            box-sizing: border-box;
+        }
+
+        .raw-text-area:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        #articleFileInput, #heroImageFileInput {
+            display: none;
+        }
+
+        .parsing-status-card {
+            margin-top: 20px;
+            width: 100%;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .spinner {
+            width: 22px;
+            height: 22px;
+            border: 3px solid var(--primary-border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* --- STEP 2: STUDIO WORKSPACE (SPLIT PANE) --- */
+        .studio-stage {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            flex: 1;
+            min-height: calc(100vh - 180px);
+            width: 100%;
+        }
+
+        .pane {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+            height: calc(100vh - 190px);
+            width: 100%;
+            min-width: 0;
+        }
+
+        .pane-header {
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border);
+            background: #fafbfe;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            gap: 8px;
+        }
+
+        .pane-title {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .pane-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .pane-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            width: 100%;
+        }
+
+        /* --- LEFT STUDIO CONTROLS --- */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .form-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-main);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .input-text {
+            width: 100%;
+            padding: 9px 12px;
+            font-size: 0.92rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            outline: none;
+            transition: all 0.2s;
+            box-sizing: border-box;
+        }
+
+        .input-text:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .btn-toolbar {
+            background: var(--bg-page);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 5px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 0.76rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-toolbar:hover {
+            background: #ffffff;
+            border-color: var(--primary-border);
+            color: var(--primary);
+        }
+
+        /* --- HERO IMAGE DROP CARD --- */
+        .hero-upload-card {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: #fdfcff;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .hero-banner-preview {
+            width: 100%;
+            height: 150px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-page);
+            border: 1px dashed var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .hero-banner-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .hero-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.76rem;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        /* --- STRUCTURE REVIEW ACCORDION --- */
+        .structure-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .section-card {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-surface);
+            overflow: hidden;
+            transition: box-shadow 0.2s ease;
+            width: 100%;
+        }
+
+        .section-card:hover {
+            box-shadow: var(--shadow-sm);
+        }
+
+        .section-header-bar {
+            background: var(--primary);
+            color: #ffffff;
+            padding: 8px 12px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            gap: 8px;
+        }
+
+        .section-intro-card .section-header-bar {
+            background: #718096;
+        }
+
+        .section-item-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.86rem;
+            transition: background 0.15s ease;
+            width: 100%;
+        }
+
+        .section-item-row:last-child {
+            border-bottom: none;
+        }
+
+        .section-item-row.is-heading {
+            background: #f6f2fc;
+        }
+
+        .section-item-row.is-heading .item-text {
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .item-checkbox {
+            accent-color: var(--primary);
+            width: 18px;
+            height: 18px;
+            margin-top: 2px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .item-body {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .item-badge-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .pill-badge {
+            font-size: 0.66rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 999px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .pill-badge.auto-heading {
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+
+        .pill-badge.user-heading {
+            background: var(--success-light);
+            color: var(--success);
+        }
+
+        .pill-badge.paragraph {
+            background: var(--bg-page);
+            color: var(--text-muted);
+        }
+
+        .pill-badge.media {
+            background: #e0f2fe;
+            color: #0284c7;
+        }
+
+        .item-btn-edit {
+            padding: 2px 6px;
+            font-size: 0.72rem;
+            background: var(--bg-page);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--text-main);
+        }
+
+        .item-btn-edit:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .item-edit-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .item-edit-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 2px;
+            flex-wrap: wrap;
+        }
+
+        .btn-edit-save {
+            background: var(--primary);
+            color: #ffffff;
+            border: none;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .btn-edit-save:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-edit-cancel {
+            background: var(--bg-page);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .btn-edit-cancel:hover {
+            color: var(--text-main);
+            border-color: var(--border-hover);
+        }
+
+        .pane-footer {
+            padding: 12px 18px;
+            border-top: 1px solid var(--border);
+            background: #fafbfe;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #ffffff;
+            border: none;
+            padding: 9px 18px;
+            font-size: 0.92rem;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(77, 37, 136, 0.25);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #publishSubmitBtn {
+            white-space: normal;
+            text-align: center;
+            line-height: 1.4;
+            word-break: normal;
+            overflow-wrap: break-word;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .btn-outline {
+            background: #ffffff;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            padding: 8px 16px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-outline:hover {
+            background: var(--primary-light);
+        }
+
+        /* --- RIGHT PANE: LIVE READER PREVIEW --- */
+        .device-selector {
+            display: flex;
+            background: var(--bg-page);
+            padding: 2px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            gap: 2px;
+        }
+
+        .device-btn {
+            background: transparent;
+            border: none;
+            padding: 4px 8px;
+            font-size: 0.74rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            white-space: nowrap;
+        }
+
+        .device-btn.active {
+            background: #ffffff;
+            color: var(--primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .preview-viewport {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            transition: all 0.3s ease;
+            min-width: 0;
+        }
+
+        .preview-viewport.device-desktop { max-width: 100%; }
+        .preview-viewport.device-tablet { max-width: 768px; }
+        .preview-viewport.device-mobile { max-width: 380px; }
+
+        .preview-article-card {
+            background: #ffffff;
+            width: 100%;
+            border-radius: var(--radius-sm);
+            padding: 28px;
+            line-height: 1.75;
+            color: #2b2b2b;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            box-sizing: border-box;
+        }
+
+        .preview-header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+            margin-bottom: 18px;
+            gap: 8px;
+        }
+
+        .preview-brand-tag {
+            font-size: 0.82rem;
+            font-weight: 800;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .preview-badge-pill {
+            background: var(--primary-light);
+            color: var(--primary);
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 3px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .preview-article-card h1 {
+            font-size: 1.75rem;
+            color: #0f172a;
+            margin: 0 0 8px 0;
+            line-height: 1.3;
+            font-weight: 800;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+
+        .preview-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+
+        .preview-article-card h3 {
+            color: var(--primary);
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin: 24px 0 10px 0;
+            line-height: 1.4;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+
+        .preview-article-card p {
+            margin: 0 0 14px 0;
+            font-size: 0.95rem;
+            line-height: 1.75;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+
+        .preview-article-card p img {
+            max-width: 100%;
+            height: auto;
+            border-radius: var(--radius-sm);
+            display: block;
+            margin: 16px auto;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        /* --- STEP 3: PUBLISH & BLOCKCHAIN DISPATCH --- */
+        .publish-stage {
+            max-width: 780px;
+            margin: 0 auto;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .role-cards-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            width: 100%;
+        }
+
+        .role-card {
+            border: 2px solid var(--border);
+            background: var(--bg-surface);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .role-card:hover {
+            border-color: var(--primary-border);
+        }
+
+        .role-card.selected {
+            border-color: var(--primary);
+            background: #faf7ff;
+            box-shadow: 0 0 0 1px var(--primary);
+        }
+
+        .role-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .role-card-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .role-card-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.45;
+        }
+
+        .auth-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            width: 100%;
+        }
+
+        .input-with-icon {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        .input-with-icon input {
+            padding-right: 44px;
+        }
+
+        .input-icon-btn {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            color: var(--text-muted);
+        }
+
+        .derived-flo-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            background: var(--bg-page);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            word-break: break-all;
+        }
+
+        .derived-flo-badge.valid {
+            background: var(--success-light);
+            border-color: #a7f3d0;
+            color: #065f46;
+        }
+
+        .derived-flo-badge.invalid {
+            background: var(--error-light);
+            border-color: #fecaca;
+            color: #991b1b;
+        }
+
+        /* --- PROGRESS & STEPPER DOCK --- */
+        .publish-progress-panel {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .progress-track {
+            height: 10px;
+            background: var(--bg-page);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            border-radius: 999px;
+            transition: width 0.3s ease;
+        }
+
+        .log-terminal-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px 0;
+        }
+
+        #logOutput {
+            background: #0f172a;
+            color: #38bdf8;
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            font-family: "Courier New", Courier, monospace;
+            font-size: 0.76rem;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            display: none;
+            width: 100%;
+        }
+
+        /* --- RECEIPT MODAL / CARD --- */
+        .receipt-card {
+            background: var(--bg-surface);
+            border: 2px solid var(--success);
+            border-radius: var(--radius-md);
+            padding: 24px 16px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            width: 100%;
+        }
+
+        .receipt-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--success-light);
+            color: var(--success);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        /* --- TOAST & CUSTOM MODALS --- */
+        .toast-container {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            left: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            z-index: 9999;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: var(--text-main);
+            color: #ffffff;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.82rem;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: slideIn 0.25s ease;
+            pointer-events: auto;
+            max-width: 100%;
+            word-break: break-word;
+        }
+
+        .toast.success { background: #065f46; }
+        .toast.error { background: #991b1b; }
+
+        @keyframes slideIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Modal Dialog */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(2px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            z-index: 9999;
+            box-sizing: border-box;
+        }
+
+        .modal-card {
+            background: var(--bg-surface);
+            border-radius: var(--radius-md);
+            max-width: 500px;
+            width: 100%;
+            padding: 20px;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            box-sizing: border-box;
+        }
+
+        .modal-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .modal-body {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+
+        /* --- RESPONSIVE MEDIA QUERIES --- */
+        @media (max-width: 960px) {
+            .studio-stage {
+                grid-template-columns: 1fr;
+                gap: 16px;
+                min-height: auto;
+            }
+            .pane {
+                height: auto;
+                min-height: 400px;
+            }
+            .pane-body {
+                max-height: 500px;
+            }
+            .role-cards-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .app-header {
+                padding: 10px 14px;
+            }
+            .brand-logo {
+                width: 32px;
+                height: 32px;
+                font-size: 0.95rem;
+            }
+            .brand-text h1 {
+                font-size: 0.98rem;
+            }
+            .brand-text p {
+                display: none;
+            }
+            .btn-header {
+                padding: 5px 10px;
+                font-size: 0.78rem;
+            }
+
+            .stepper-container {
+                padding: 10px 12px;
+            }
+            .step-item {
+                gap: 4px;
+                flex: initial;
+            }
+            .step-number {
+                width: 24px;
+                height: 24px;
+                font-size: 0.72rem;
+            }
+            .step-title {
+                font-size: 0.72rem;
+            }
+            .step-desc {
+                display: none !important;
+            }
+            .step-divider {
+                margin: 0 4px;
+                flex: 1 1 8px;
+                min-width: 6px;
+            }
+
+            .main-wrapper {
+                padding: 12px 10px;
+            }
+
+            .upload-stage {
+                padding: 16px 0;
+            }
+            .dropzone {
+                padding: 30px 14px;
+            }
+            .dropzone-title {
+                font-size: 1.05rem;
+            }
+            .dropzone-subtitle {
+                font-size: 0.8rem;
+            }
+
+            .pane-header {
+                padding: 10px 12px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            .pane-controls {
+                width: 100%;
+                justify-content: flex-start;
+            }
+            .pane-body {
+                padding: 14px 10px;
+                max-height: 440px;
+            }
+            .pane-footer {
+                padding: 10px 12px;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            .pane-footer button {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .preview-article-card {
+                padding: 16px 12px;
+            }
+            .preview-article-card h1 {
+                font-size: 1.35rem;
+            }
+            .preview-article-card h3 {
+                font-size: 1.05rem;
+                margin: 18px 0 8px 0;
+            }
+            .preview-article-card p {
+                font-size: 0.88rem;
+            }
+
+            .auth-card {
+                padding: 16px 12px;
+            }
+            #publishSubmitBtn {
+                font-size: 0.95rem !important;
+                padding: 12px 14px !important;
+                white-space: normal !important;
+                line-height: 1.35 !important;
+                text-align: center;
+                width: 100%;
+            }
+            .modal-card {
+                padding: 16px 12px;
+                max-width: 92vw;
+            }
+        }
+
+        /* For ultra-compact screens (< 380px) */
+        @media (max-width: 380px) {
+            .step-item:not(.active) .step-title {
+                display: none;
+            }
+            .btn-header span:not(:first-child) {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- APP HEADER -->
+    <header class="app-header">
+        <div class="header-brand">
+            <div class="brand-logo">RM</div>
+            <div class="brand-text">
+                <h1>RanchiMall Times</h1>
+                <p>Decentralized Content Publishing Studio</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button class="btn-header" onclick="resetPublisherStudio()" title="Reset workspace">
+                <span>🔄</span> New Article
+            </button>
+            <button class="btn-header" onclick="openPreviewInNewTab()" id="headerPreviewBtn" style="display:none;" title="Open article in a new tab">
+                <span>👁</span> Open Preview
+            </button>
+        </div>
+    </header>
+
+    <!-- STEPPER BAR -->
+    <div class="stepper-container">
+        <div class="stepper">
+            <div class="step-item active" id="stepIndicator1" onclick="goToStep(1)">
+                <div class="step-number" id="stepNum1">1</div>
+                <div class="step-info">
+                    <span class="step-title">Upload / Paste</span>
+                    <span class="step-desc">Docx, PDF or Text</span>
+                </div>
+            </div>
+            <div class="step-divider"></div>
+            <div class="step-item" id="stepIndicator2" onclick="goToStep(2)">
+                <div class="step-number" id="stepNum2">2</div>
+                <div class="step-info">
+                    <span class="step-title">Structure &amp; Studio</span>
+                    <span class="step-desc">Headings, Media &amp; Live View</span>
+                </div>
+            </div>
+            <div class="step-divider"></div>
+            <div class="step-item" id="stepIndicator3" onclick="goToStep(3)">
+                <div class="step-number" id="stepNum3">3</div>
+                <div class="step-info">
+                    <span class="step-title">Blockchain Publish</span>
+                    <span class="step-desc">Keys &amp; SuperNodes Dispatch</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN WORKSPACE -->
+    <main class="main-wrapper">
+
+        <!-- STEP 1: INGESTION STAGE -->
+        <section id="stepStage1" class="upload-stage">
+            <!-- Mode Tabs: Upload vs Paste -->
+            <div class="input-mode-tabs">
+                <button type="button" class="mode-tab active" id="tabUploadMode" onclick="setInputMode('upload')">
+                    📄 Upload Document
+                </button>
+                <button type="button" class="mode-tab" id="tabPasteMode" onclick="setInputMode('paste')">
+                    📋 Paste Raw Text
+                </button>
+            </div>
+
+            <!-- Upload Dropzone Container -->
+            <div id="uploadModeContainer" style="width: 100%;">
+                <div class="dropzone" id="dropzoneEl" onclick="document.getElementById('articleFileInput').click()">
+                    <div class="dropzone-icon">📄</div>
+                    <div class="dropzone-title">Upload your Article Document</div>
+                    <div class="dropzone-subtitle">Drag and drop your file here, or click to browse</div>
+                    <div class="dropzone-tags">
+                        <span class="dropzone-badge">Word (.docx)</span>
+                        <span class="dropzone-badge">PDF (.pdf)</span>
+                        <span class="dropzone-badge">Text (.txt, .md)</span>
+                    </div>
+                    <input type="file" id="articleFileInput" accept=".docx,.pdf,.txt,.md,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                </div>
+            </div>
+
+            <!-- Paste Raw Text Container -->
+            <div id="pasteModeContainer" class="paste-text-card" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label" for="pasteTitleInput">Article Title (Optional - auto-derived if blank)</label>
+                    <input type="text" id="pasteTitleInput" class="input-text" placeholder="Enter title or leave blank to detect from text...">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="rawTextInput">Article Content</label>
+                    <textarea id="rawTextInput" class="raw-text-area" placeholder="Paste your article text here...&#10;&#10;Numbered sections, titles, and paragraphs will be auto-detected and structured."></textarea>
+                </div>
+
+                <button type="button" class="btn-primary" onclick="parsePastedRawText()" style="width: 100%; justify-content: center; padding: 12px;">
+                    ✨ Extract &amp; Open in Studio →
+                </button>
+            </div>
+
+            <div id="parsingCard" class="parsing-status-card" style="display:none;">
+                <div class="spinner"></div>
+                <div>
+                    <div style="font-weight: 700; font-size: 0.9rem;" id="parsingTitle">Processing document...</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);" id="parsingDetails">Extracting headings, paragraphs, and embedded figures...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- STEP 2: STUDIO & LIVE PREVIEW STAGE -->
+        <section id="stepStage2" class="studio-stage" style="display:none;">
+            <!-- LEFT PANE: STRUCTURE & MEDIA CONTROLS -->
+            <div class="pane">
+                <div class="pane-header">
+                    <div class="pane-title">
+                        <span>⚙️</span> Article Structure &amp; Assets
+                    </div>
+                    <div class="pane-controls">
+                        <button type="button" class="btn-toolbar" id="collapseAllBtn">Collapse All</button>
+                        <button type="button" class="btn-toolbar" id="expandAllBtn">Expand All</button>
+                        <button type="button" class="btn-toolbar" id="resetStructureBtn">Reset Heuristics</button>
+                    </div>
+                </div>
+
+                <div class="pane-body">
+                    <!-- Title Input -->
+                    <div class="form-group">
+                        <label class="form-label" for="reviewTitleInput">Article Title</label>
+                        <input type="text" id="reviewTitleInput" class="input-text" placeholder="Enter article headline...">
+                    </div>
+
+                    <!-- Hero Image Card -->
+                    <div class="hero-upload-card">
+                        <div class="form-label" style="display: flex; justify-content: space-between;">
+                            <span>Hero Image (Optional 16:9 Banner)</span>
+                            <span id="heroImageStatusBadge" style="font-size: 0.72rem; color: var(--text-muted);">None selected</span>
+                        </div>
+                        <div class="hero-banner-preview" id="heroBannerPreview" onclick="document.getElementById('heroImageFileInput').click()" style="cursor: pointer;" title="Click to upload hero image">
+                            <span style="font-size: 0.82rem; color: var(--text-muted);">📷 Click to select 16:9 Hero Image</span>
+                        </div>
+                        <input type="file" id="heroImageFileInput" accept="image/*">
+                        <div class="hero-stats" id="heroStatsRow" style="display:none;">
+                            <span id="heroStatsMain">Main: 800x450 px</span>
+                            <span id="heroStatsThumb">Thumb: &lt;100 KB</span>
+                        </div>
+                    </div>
+
+                    <!-- Structure List Header -->
+                    <div class="toolbar-group">
+                        <span class="form-label">Detected Sections &amp; Paragraphs</span>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);" id="structureStatsBadge">0 sections</span>
+                    </div>
+
+                    <!-- Scrollable Structure List -->
+                    <div id="structureList" class="structure-list"></div>
+                </div>
+
+                <div class="pane-footer">
+                    <button type="button" class="btn-outline" onclick="goToStep(1)">← Back to Upload</button>
+                    <button type="button" class="btn-primary" id="confirmStructureBtn" onclick="confirmAndProceedToPublish()">
+                        Proceed to Publish →
+                    </button>
+                </div>
+            </div>
+
+            <!-- RIGHT PANE: LIVE READER PREVIEW -->
+            <div class="pane">
+                <div class="pane-header">
+                    <div class="pane-title">
+                        <span>👁️</span> Live Article Preview
+                    </div>
+                    <div class="pane-controls">
+                        <div class="device-selector">
+                            <button type="button" class="device-btn active" id="btnDeviceDesktop" onclick="setDeviceViewport('desktop')">💻 Desktop</button>
+                            <button type="button" class="device-btn" id="btnDeviceTablet" onclick="setDeviceViewport('tablet')">📱 Tablet</button>
+                            <button type="button" class="device-btn" id="btnDeviceMobile" onclick="setDeviceViewport('mobile')">📱 Mobile</button>
+                        </div>
+                        <button type="button" class="btn-toolbar" onclick="openPreviewInNewTab()" title="Open preview in full new tab">↗ New Tab</button>
+                    </div>
+                </div>
+
+                <div class="pane-body" style="background: #f1f5f9; align-items: center;">
+                    <div class="preview-viewport device-desktop" id="previewViewport">
+                        <div class="preview-article-card" id="previewArticleCard">
+                            <div class="preview-header-bar">
+                                <span class="preview-brand-tag">RanchiMall Times</span>
+                                <span class="preview-badge-pill">Live Article Preview</span>
+                            </div>
+                            <div id="liveHeroImageContainer"></div>
+                            <h1 id="livePreviewTitle">Article Title</h1>
+                            <div class="preview-meta" id="livePreviewMeta">0 min read &nbsp;|&nbsp; RM Times Direct Publisher</div>
+                            <div id="livePreviewBody"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pane-footer">
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn-toolbar" id="downloadPreviewBtn">💾 Export HTML</button>
+                        <button type="button" class="btn-toolbar" id="downloadJsonBtn">📄 Export JSON</button>
+                    </div>
+                    <span style="font-size: 0.78rem; color: var(--text-muted);" id="liveReadTimeLabel">⏱ ~0 min read</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- STEP 3: PUBLISH & BLOCKCHAIN STAGE -->
+        <section id="stepStage3" class="publish-stage" style="display:none;">
+            <!-- Role Selection -->
+            <div class="role-cards-grid">
+                <div class="role-card selected" id="roleCardUser" onclick="selectPublisherRole('user')">
+                    <div class="role-card-header">
+                        <div class="role-card-title">General User Login</div>
+                        <input type="radio" name="publisherRole" value="user" checked>
+                    </div>
+                    <div class="role-card-desc">
+                        Direct publishing with Cloudinary &amp; Google Drive dual fallback image storage and SHA-256 deduplication.
+                    </div>
+                </div>
+
+                <div class="role-card" id="roleCardSubadmin" onclick="selectPublisherRole('subadmin')">
+                    <div class="role-card-header">
+                        <div class="role-card-title">Subadmin Login</div>
+                        <input type="radio" name="publisherRole" value="subadmin">
+                    </div>
+                    <div class="role-card-desc">
+                        Editorial publishing with direct image commits to the official GitHub repository (<code style="font-size: 0.75rem;">ranchimall/rmtimes</code>).
+                    </div>
+                </div>
+            </div>
+
+            <!-- Credentials & Auth Form Card -->
+            <div class="auth-card">
+                <div class="form-group">
+                    <label class="form-label" for="floPrivateKeyInput">FLO Private Key (WIF)</label>
+                    <div class="input-with-icon">
+                        <input type="password" id="floPrivateKeyInput" class="input-text" placeholder="Enter FLO private key (WIF)..." oninput="onPrivateKeyChanged(this.value)">
+                        <button type="button" class="input-icon-btn" onclick="togglePasswordVisibility('floPrivateKeyInput')">👁</button>
+                    </div>
+                </div>
+
+                <div id="derivedFloAddressBadge" class="derived-flo-badge" style="display:none;">
+                    <span id="derivedFloIcon">🔑</span>
+                    <span id="derivedFloText">Derived Address: -</span>
+                </div>
+
+                <!-- Contributors Input -->
+                <div class="form-group">
+                    <label class="form-label" for="contributorsInput">Contributors (Optional)</label>
+                    <input type="text" id="contributorsInput" class="input-text" placeholder="Comma-separated FLO IDs of other contributors of this article...">
+                </div>
+
+                <!-- GitHub Token (Subadmin only) -->
+                <div class="form-group" id="githubTokenGroup" style="display:none;">
+                    <label class="form-label" for="githubTokenInput">GitHub Personal Access Token (contents: write)</label>
+                    <div class="input-with-icon">
+                        <input type="password" id="githubTokenInput" class="input-text" placeholder="ghp_...">
+                        <button type="button" class="input-icon-btn" onclick="togglePasswordVisibility('githubTokenInput')">👁</button>
+                    </div>
+                </div>
+
+                <!-- Publish Action Button -->
+                <button type="button" class="btn-primary" id="publishSubmitBtn" onclick="publishDirectUserContent()" style="width: 100%; justify-content: center; padding: 14px; font-size: 1.05rem; white-space: normal; text-align: center; line-height: 1.4;">
+                    Send Publishing Request to RanchiMall Times
+                </button>
+            </div>
+
+            <!-- Progress & Logs Panel -->
+            <div id="publishProgressContainer" class="publish-progress-panel" style="display:none;">
+                <div class="progress-header">
+                    <span id="progressStatusText">Processing: Initializing...</span>
+                    <span id="progressPercentage">0%</span>
+                </div>
+                <div class="progress-track">
+                    <div id="progressBarFill" class="progress-fill"></div>
+                </div>
+
+                <div class="log-terminal-toggle" onclick="toggleLogTerminal()">
+                    <span>📜 Technical Execution Logs</span>
+                    <span id="logToggleArrow">▼ Show</span>
+                </div>
+                <div id="logOutput"></div>
+            </div>
+
+            <!-- Receipt Summary Card (Shown upon successful dispatch) -->
+            <div id="receiptSummaryCard" class="receipt-card" style="display:none;">
+                <div class="receipt-icon">✓</div>
+                <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-main);">
+                    Publication Request Submitted!
+                </div>
+                <p style="font-size: 0.9rem; color: var(--text-muted); max-width: 500px;">
+                    Your article has been successfully dispatched to the RM Times SuperNodes network.
+                </p>
+                <div id="receiptDetails" style="background: var(--bg-page); border: 1px solid var(--border); padding: 12px 18px; border-radius: var(--radius-sm); font-size: 0.85rem; font-family: monospace;"></div>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button type="button" class="btn-outline" onclick="openPreviewInNewTab()">👁 View Article</button>
+                    <button type="button" class="btn-primary" onclick="resetPublisherStudio()">🔄 Publish Another</button>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-start;">
+                <button type="button" class="btn-outline" onclick="goToStep(2)">← Back to Structure Editor</button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- CUSTOM CONFIRM / ALERT MODAL -->
+    <div id="customModalOverlay" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-title" id="modalTitle">Notice</div>
+            <div class="modal-body" id="modalBody">Message text</div>
+            <div class="modal-actions" id="modalActions">
+                <button type="button" class="btn-outline" id="modalCancelBtn">Cancel</button>
+                <button type="button" class="btn-primary" id="modalConfirmBtn">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // =========================================================================
+        // 1. SUPERNODE CONFIGURATION & CONSTANTS
+        // =========================================================================
+        const supernodesList = {
+            "FQUepiEXu4zhEtENqLA8RXdidXYiCUPeuc": {
+                uri: "ranchimallcloud1.duckdns.org",
+                pubKey: "03A0AD65FFBB8CAE0316BC93EE2BD6BDDF3A47970C2D550E4E1C7DFC559F131EA2"
+            },
+            "FBjW246c4VT9KC4p5CLsEjd7gMGcaFWBov": {
+                uri: "ranchimallcloud0.duckdns.org",
+                pubKey: "03DABC832B95F088CA88F87D154B73B415F085945CFF3D4C36DCE081518D229B31"
+            }
+        };
+
+        const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/isgumel2/image/upload";
+        const CLOUDINARY_PRESET = "rmtimes";
+        const GDRIVE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKJQ0P47iQ6hBLY9hHxLiNAOyFtbatyR7WMTP517U9F85BGu1PVFuypqtj5QaxaowH/exec";
+
+        const GITHUB_OWNER = "ranchimall";
+        const GITHUB_REPO = "rmtimes";
+        const GITHUB_BRANCH = "imageinsidearticle";
+        const GITHUB_REPO_IMAGE_PATH = "images";
+        const GITHUB_IMAGE_BASE_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${GITHUB_REPO_IMAGE_PATH}/`;
+        const DEFAULT_IMAGE_WIDTH = 800;
+
+        const HEURISTIC_MAX_WORDS = 12;
+        const SENTENCE_ENDINGS = [".", "!", "?", ":", ";", ","];
+        const NUMBERED_HEADING_MIN_MATCHES = 2;
+        const NUMBERED_HEADING_RE = /^\d+(\.\d+)*\.?\s+\S/;
+
+        const OOXML_NS = {
+            w:   "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+            r:   "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            a:   "http://schemas.openxmlformats.org/drawingml/2006/main",
+            wp:  "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+            rel: "http://schemas.openxmlformats.org/package/2006/relationships",
+            dc:  "http://purl.org/dc/elements/1.1/"
+        };
+
+        const TABLE_STYLE_BLOCK = `<style>
+        .rmtimes-table-wrap {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 20px 0;
+        }
+        .rmtimes-table-wrap table {
+            width: max-content;
+            min-width: 100%;
+            table-layout: auto;
+            border-collapse: collapse;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 0.95rem;
+        }
+        .rmtimes-table-wrap th,
+        .rmtimes-table-wrap td {
+            white-space: normal;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        .rmtimes-table-wrap th {
+            background-color: #4d2588;
+            color: #ffffff;
+            text-align: left;
+            padding: 12px 14px;
+            font-weight: 600;
+        }
+        .rmtimes-table-wrap td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: top;
+            color: #333333;
+        }
+        .rmtimes-table-wrap tr:nth-child(even) {
+            background-color: #fcfbfe;
+        }
+        @media (max-width: 480px) {
+            .rmtimes-table-wrap th,
+            .rmtimes-table-wrap td {
+                padding: 6px 8px;
+                font-size: 0.85rem;
+            }
+        }
+        </style>`;
+
+        // State variables
+        let loadedArticle = null;
+        let pendingImages = [];
+        let pendingParse = null;
+        let docxStemForDownload = "article";
+        let heroImageBlobData = null;
+        let currentStep = 1;
+
+        // =========================================================================
+        // 2. UI HELPERS, TOASTS & MODALS
+        // =========================================================================
+        function showToast(message, type = "info") {
+            const container = document.getElementById("toastContainer");
+            const toast = document.createElement("div");
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = "0";
+                toast.style.transform = "translateY(10px)";
+                toast.style.transition = "all 0.25s ease";
+                setTimeout(() => toast.remove(), 250);
+            }, 3500);
+        }
+
+        function showCustomModal({ title, message, confirmText = "OK", cancelText = null }) {
+            return new Promise((resolve) => {
+                const overlay = document.getElementById("customModalOverlay");
+                const titleEl = document.getElementById("modalTitle");
+                const bodyEl = document.getElementById("modalBody");
+                const confirmBtn = document.getElementById("modalConfirmBtn");
+                const cancelBtn = document.getElementById("modalCancelBtn");
+
+                titleEl.textContent = title;
+                bodyEl.innerHTML = message;
+                confirmBtn.textContent = confirmText;
+
+                if (cancelText) {
+                    cancelBtn.style.display = "inline-flex";
+                    cancelBtn.textContent = cancelText;
+                } else {
+                    cancelBtn.style.display = "none";
+                }
+
+                overlay.style.display = "flex";
+
+                const onConfirm = () => {
+                    cleanup();
+                    resolve(true);
+                };
+
+                const onCancel = () => {
+                    cleanup();
+                    resolve(false);
+                };
+
+                const cleanup = () => {
+                    confirmBtn.removeEventListener("click", onConfirm);
+                    cancelBtn.removeEventListener("click", onCancel);
+                    overlay.style.display = "none";
+                };
+
+                confirmBtn.addEventListener("click", onConfirm);
+                cancelBtn.addEventListener("click", onCancel);
+            });
+        }
+
+        function setInputMode(mode) {
+            const isUpload = mode === "upload";
+            document.getElementById("tabUploadMode").classList.toggle("active", isUpload);
+            document.getElementById("tabPasteMode").classList.toggle("active", !isUpload);
+            document.getElementById("uploadModeContainer").style.display = isUpload ? "block" : "none";
+            document.getElementById("pasteModeContainer").style.display = isUpload ? "none" : "flex";
+        }
+
+        function togglePasswordVisibility(inputId) {
+            const input = document.getElementById(inputId);
+            if (input) input.type = input.type === "password" ? "text" : "password";
+        }
+
+        function toggleLogTerminal() {
+            const logEl = document.getElementById("logOutput");
+            const arrow = document.getElementById("logToggleArrow");
+            if (logEl.style.display === "none" || !logEl.style.display) {
+                logEl.style.display = "block";
+                arrow.textContent = "▲ Hide";
+            } else {
+                logEl.style.display = "none";
+                arrow.textContent = "▼ Show";
+            }
+        }
+
+        function setDeviceViewport(device) {
+            const vp = document.getElementById("previewViewport");
+            document.querySelectorAll(".device-btn").forEach(b => b.classList.remove("active"));
+            if (device === "desktop") {
+                vp.className = "preview-viewport device-desktop";
+                document.getElementById("btnDeviceDesktop").classList.add("active");
+            } else if (device === "tablet") {
+                vp.className = "preview-viewport device-tablet";
+                document.getElementById("btnDeviceTablet").classList.add("active");
+            } else if (device === "mobile") {
+                vp.className = "preview-viewport device-mobile";
+                document.getElementById("btnDeviceMobile").classList.add("active");
+            }
+        }
+
+        function goToStep(step) {
+            if (step === 2 && !pendingParse && !loadedArticle) {
+                showToast("Please upload, paste, or parse an article first.", "error");
+                return;
+            }
+            if (step === 3 && !loadedArticle && !pendingParse) {
+                showToast("Please review and confirm article structure first.", "error");
+                return;
+            }
+
+            currentStep = step;
+            document.querySelectorAll(".step-item").forEach((el, idx) => {
+                const s = idx + 1;
+                el.classList.remove("active", "completed");
+                if (s === step) el.classList.add("active");
+                else if (s < step) el.classList.add("completed");
+            });
+
+            document.getElementById("stepStage1").style.display = step === 1 ? "flex" : "none";
+            document.getElementById("stepStage2").style.display = step === 2 ? "grid" : "none";
+            document.getElementById("stepStage3").style.display = step === 3 ? "flex" : "none";
+
+            if (step === 2) {
+                updateLivePreview();
+            }
+        }
+
+        function selectPublisherRole(role) {
+            const isSubadmin = role === "subadmin";
+            document.getElementById("roleCardUser").classList.toggle("selected", !isSubadmin);
+            document.getElementById("roleCardSubadmin").classList.toggle("selected", isSubadmin);
+            document.querySelector(`input[name="publisherRole"][value="${role}"]`).checked = true;
+            document.getElementById("githubTokenGroup").style.display = isSubadmin ? "flex" : "none";
+        }
+
+        function onPrivateKeyChanged(val) {
+            const badge = document.getElementById("derivedFloAddressBadge");
+            const text = document.getElementById("derivedFloText");
+            const icon = document.getElementById("derivedFloIcon");
+            if (!val || val.trim() === "") {
+                badge.style.display = "none";
+                return;
+            }
+            try {
+                const derivedAddress = floCrypto.getAddress(val.trim());
+                if (derivedAddress) {
+                    badge.style.display = "flex";
+                    badge.className = "derived-flo-badge valid";
+                    icon.textContent = "✓";
+                    text.textContent = `Derived FLO Address: ${derivedAddress}`;
+                } else {
+                    throw new Error("Invalid format");
+                }
+            } catch (e) {
+                badge.style.display = "flex";
+                badge.className = "derived-flo-badge invalid";
+                icon.textContent = "✗";
+                text.textContent = "Invalid Private Key format";
+            }
+        }
+
+        function logToScreen(message) {
+            const logElement = document.getElementById("logOutput");
+            logElement.style.display = "block";
+            logElement.textContent += message + "\n";
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function updateProgress(percent, statusMessage, isComplete = false, isError = false) {
+            const container = document.getElementById("publishProgressContainer");
+            const bar = document.getElementById("progressBarFill");
+            const text = document.getElementById("progressStatusText");
+            const pct = document.getElementById("progressPercentage");
+            if (!container || !bar || !text || !pct) return;
+
+            container.style.display = "flex";
+            const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+            bar.style.width = clamped + "%";
+            pct.textContent = clamped + "%";
+            text.textContent = statusMessage || `Processing: ${clamped}%`;
+
+            if (isComplete) {
+                bar.style.background = "var(--success)";
+            } else if (isError) {
+                bar.style.background = "var(--error)";
+            } else {
+                bar.style.background = "linear-gradient(90deg, var(--primary), var(--accent))";
+            }
+        }
+
+        function escapeHtml(text) {
+            return (text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function calculateReadTime(text) {
+            const wordsPerMinute = 200;
+            const words = text ? text.trim().split(/\s+/).length : 0;
+            return Math.max(1, Math.ceil(words / wordsPerMinute));
+        }
+
+        function parseContributors(rawInput, myFloID) {
+            const contributors = [myFloID];
+            if (rawInput && rawInput.trim() !== "") {
+                const entries = rawInput.split(",").map(s => s.trim()).filter(s => s !== "");
+                const alphanumericPattern = /^[a-zA-Z0-9]+$/;
+                for (const entry of entries) {
+                    if (!alphanumericPattern.test(entry)) {
+                        showToast(`"${entry}" is not valid alphanumeric and will be skipped.`, "warning");
+                        continue;
+                    }
+                    if (!contributors.includes(entry)) {
+                        contributors.push(entry);
+                    }
+                }
+            }
+            return contributors;
+        }
+
+        function getMimeType(filename) {
+            const ext = (filename.match(/\.[a-zA-Z0-9]+$/) || [""])[0].toLowerCase();
+            if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+            if (ext === ".gif") return "image/gif";
+            if (ext === ".webp") return "image/webp";
+            if (ext === ".svg") return "image/svg+xml";
+            return "image/png";
+        }
+
+        function bytesToBase64(bytes) {
+            let binary = "";
+            const chunkSize = 0x8000;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+            }
+            return btoa(binary);
+        }
+
+        async function calculateSha256Hex(bytes) {
+            const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+        }
+
+        // =========================================================================
+        // 3. PARSING ENGINES (DOCX, PDF.js & RAW TEXT)
+        // =========================================================================
+        function directChildren(el, ns, local) {
+            return Array.from(el.children).filter(c => c.namespaceURI === ns && c.localName === local);
+        }
+
+        function parseXml(xmlString, label) {
+            const doc = new DOMParser().parseFromString(xmlString, "application/xml");
+            const err = doc.getElementsByTagName("parsererror")[0];
+            if (err) throw new Error(`Failed to parse ${label}: ${err.textContent.slice(0, 200)}`);
+            return doc;
+        }
+
+        function getParagraphText(pEl) {
+            let text = "";
+            (function walk(node) {
+                for (const child of node.childNodes) {
+                    if (child.nodeType !== 1) continue;
+                    const local = child.localName;
+                    if (child.namespaceURI === OOXML_NS.w && local === "t") {
+                        text += child.textContent;
+                    } else if (child.namespaceURI === OOXML_NS.w && local === "tab") {
+                        text += "\t";
+                    } else if (child.namespaceURI === OOXML_NS.w && (local === "br" || local === "cr")) {
+                        text += " ";
+                    } else {
+                        walk(child);
+                    }
+                }
+            })(pEl);
+            return text;
+        }
+
+        function looksLikeNumberedHeading(text) {
+            return NUMBERED_HEADING_RE.test(text.trim());
+        }
+
+        function looksLikeHeadingText(text) {
+            const words = text.split(/\s+/).filter(Boolean);
+            if (!words.length || words.length > HEURISTIC_MAX_WORDS) return false;
+            const trimmed = text.trim();
+            return !SENTENCE_ENDINGS.includes(trimmed.slice(-1));
+        }
+
+        function classifyParagraphHeading(p, text, isHeadingFn) {
+            if (isHeadingFn && isHeadingFn(p)) return { heading: true, reason: "style" };
+            const trimmed = text.trim();
+            const numberedMatch = trimmed.match(/^(\d+(?:\.\d+)*\.?)\s+(\S.*)$/);
+            const numbered = !!numberedMatch;
+            const textAfterNumber = numbered ? numberedMatch[2] : trimmed;
+            const hasFullStop = textAfterNumber.includes(".");
+
+            if (hasFullStop) {
+                return {
+                    heading: false,
+                    reason: numbered ? "numbered pattern with full stop" : "contains full stop"
+                };
+            }
+            if (numbered) return { heading: true, reason: "numbered pattern" };
+            if (looksLikeHeadingText(trimmed)) return { heading: true, reason: "heuristic guess" };
+            return { heading: false, reason: "plain text" };
+        }
+
+        function convertRawText(rawText, titleHint = "") {
+            if (!rawText || !rawText.trim()) {
+                throw new Error("No text provided. Please paste or enter some content.");
+            }
+
+            const rawParagraphs = rawText.split(/\r?\n\s*\r?\n/).map(p => p.trim()).filter(Boolean);
+            if (!rawParagraphs.length) {
+                throw new Error("No readable paragraphs found in the text.");
+            }
+
+            let title = (titleHint || "").trim();
+            let startIndex = 0;
+
+            if (!title) {
+                const firstPara = rawParagraphs[0];
+                if (firstPara.length < 160 && !firstPara.endsWith(".")) {
+                    title = firstPara;
+                    startIndex = 1;
+                } else {
+                    title = firstPara.slice(0, 80) + (firstPara.length > 80 ? "..." : "");
+                }
+            }
+
+            const flatItems = [];
+            let itemCounter = 0;
+
+            for (let i = startIndex; i < rawParagraphs.length; i++) {
+                const para = rawParagraphs[i];
+                if (!para) continue;
+
+                const isMarkdownHeading = /^#{1,4}\s+(.+)$/.test(para);
+                let cleanPara = para;
+                let isHeading = false;
+                let reason = "paragraph";
+
+                if (isMarkdownHeading) {
+                    cleanPara = para.replace(/^#{1,4}\s+/, "").trim();
+                    isHeading = true;
+                    reason = "markdown heading (#)";
+                } else {
+                    const isNumbered = looksLikeNumberedHeading(cleanPara);
+                    const isLikelyHeading = looksLikeHeadingText(cleanPara) && cleanPara.length < 120;
+
+                    if (isNumbered) {
+                        isHeading = true;
+                        reason = "numbered heading";
+                    } else if (isLikelyHeading) {
+                        isHeading = true;
+                        reason = "heuristic guess";
+                    }
+                }
+
+                itemCounter += 1;
+                flatItems.push({
+                    id: `item${itemCounter}`,
+                    kind: "paragraph",
+                    text: cleanPara,
+                    originalText: cleanPara,
+                    suggestedHeading: isHeading,
+                    reason: reason
+                });
+            }
+
+            if (!title && flatItems.length > 0) {
+                title = "Pasted Article";
+            }
+
+            return { title, flatItems, extractedImages: [], headingMode: "text" };
+        }
+
+        function findExtent(blipEl) {
+            let node = blipEl.parentElement;
+            while (node) {
+                const extent = directChildren(node, OOXML_NS.wp, "extent")[0];
+                if (extent) return extent;
+                node = node.parentElement;
+            }
+            return null;
+        }
+
+        function renderTableBlock(tblEl) {
+            const rows = directChildren(tblEl, OOXML_NS.w, "tr");
+            const rowsHtml = rows.map((row, i) => {
+                const tag = i === 0 ? "th" : "td";
+                const cells = directChildren(row, OOXML_NS.w, "tc");
+                const cellsHtml = cells.map(cell => {
+                    const paras = directChildren(cell, OOXML_NS.w, "p");
+                    const parts = paras
+                        .map(p => getParagraphText(p).trim())
+                        .filter(Boolean)
+                        .map(escapeHtml);
+                    return `<${tag}>${parts.join("<br>")}</${tag}>`;
+                }).join("\n        ");
+                return `    <tr>\n        ${cellsHtml}\n    </tr>`;
+            });
+            const tableHtml = `<div class="rmtimes-table-wrap">\n<table>\n${rowsHtml.join("\n")}\n</table>\n</div>`;
+            return TABLE_STYLE_BLOCK + "\n" + tableHtml;
+        }
+
+        function renderContentHtml(sections) {
+            const blocksOut = [];
+            for (const section of sections) {
+                const lines = [];
+                if (section.title !== null) {
+                    lines.push(`<h3>${escapeHtml(section.title)}</h3>`);
+                    for (const block of section.blocks) {
+                        if (block.kind === "text") lines.push(`<p>${escapeHtml(block.content)}</p>`);
+                        else lines.push(`<p>${block.content}</p>`);
+                    }
+                } else {
+                    let textRun = [];
+                    const flushTextRun = () => {
+                        if (textRun.length) {
+                            const joined = textRun.join(" ").trim();
+                            if (joined) lines.push(`<p>${escapeHtml(joined)}</p>`);
+                            textRun = [];
+                        }
+                    };
+                    for (const block of section.blocks) {
+                        if (block.kind === "text") {
+                            textRun.push(block.content);
+                        } else {
+                            flushTextRun();
+                            lines.push(`<p>${block.content}</p>`);
+                        }
+                    }
+                    flushTextRun();
+                }
+                if (lines.length) blocksOut.push(lines.join("\n"));
+            }
+            return blocksOut.join("\n\n").trim();
+        }
+
+        function normalizeForCompare(text) {
+            return (text || "").trim().replace(/\s+/g, " ").toLowerCase();
+        }
+
+        async function convertDocxFile(file) {
+            const zip = await JSZip.loadAsync(file);
+            const docEntry = zip.file("word/document.xml");
+            if (!docEntry) throw new Error("Not a valid .docx: word/document.xml not found.");
+            const docXml = parseXml(await docEntry.async("string"), "word/document.xml");
+
+            const relsEntry = zip.file("word/_rels/document.xml.rels");
+            const relsXml = parseXml(
+                relsEntry ? await relsEntry.async("string") : '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+                "document.xml.rels"
+            );
+
+            const stylesEntry = zip.file("word/styles.xml");
+            const stylesXml = parseXml(
+                stylesEntry ? await stylesEntry.async("string") : `<w:styles xmlns:w="${OOXML_NS.w}"/>`,
+                "styles.xml"
+            );
+
+            const coreEntry = zip.file("docProps/core.xml");
+            const coreXml = coreEntry ? parseXml(await coreEntry.async("string"), "core.xml") : null;
+
+            const styleMap = {};
+            for (const styleEl of Array.from(stylesXml.getElementsByTagNameNS(OOXML_NS.w, "style"))) {
+                if (styleEl.getAttributeNS(OOXML_NS.w, "type") !== "paragraph") continue;
+                const id = styleEl.getAttributeNS(OOXML_NS.w, "styleId");
+                const nameEl = directChildren(styleEl, OOXML_NS.w, "name")[0];
+                const nameVal = nameEl ? (nameEl.getAttributeNS(OOXML_NS.w, "val") || "").toLowerCase() : "";
+                if (id) styleMap[id] = nameVal;
+            }
+
+            function getParaStyleName(p) {
+                const pPr = directChildren(p, OOXML_NS.w, "pPr")[0];
+                if (!pPr) return "";
+                const pStyle = directChildren(pPr, OOXML_NS.w, "pStyle")[0];
+                if (!pStyle) return "";
+                const id = pStyle.getAttributeNS(OOXML_NS.w, "val");
+                return styleMap[id] || "";
+            }
+            const hasHeadingStyle = p => getParaStyleName(p).startsWith("heading");
+            const isTitleStyle = p => getParaStyleName(p) === "title";
+            const isHeading = p => hasHeadingStyle(p) || isTitleStyle(p);
+
+            const relsMap = {};
+            for (const relEl of Array.from(relsXml.getElementsByTagNameNS(OOXML_NS.rel, "Relationship"))) {
+                relsMap[relEl.getAttribute("Id")] = relEl.getAttribute("Target");
+            }
+
+            let coreTitle = "";
+            if (coreXml) {
+                const titleEls = coreXml.getElementsByTagNameNS(OOXML_NS.dc, "title");
+                if (titleEls.length) coreTitle = (titleEls[0].textContent || "").trim();
+            }
+
+            const body = docXml.getElementsByTagNameNS(OOXML_NS.w, "body")[0];
+            if (!body) throw new Error("Not a valid .docx: <w:body> not found.");
+            const bodyParagraphs = directChildren(body, OOXML_NS.w, "p");
+
+            const hasRealHeadings = bodyParagraphs.some(p => getParagraphText(p).trim() && hasHeadingStyle(p));
+            let headingMode;
+            if (hasRealHeadings) {
+                headingMode = "style";
+            } else {
+                const numberedCount = bodyParagraphs.filter(p => {
+                    const t = getParagraphText(p).trim();
+                    return t && looksLikeNumberedHeading(t);
+                }).length;
+                headingMode = numberedCount >= NUMBERED_HEADING_MIN_MATCHES ? "numbered" : "heuristic";
+            }
+
+            const docxStem = file.name.replace(/\.docx$/i, "");
+            let title = null;
+            for (const p of bodyParagraphs) {
+                const t = getParagraphText(p).trim();
+                if (t && isTitleStyle(p)) { title = t; break; }
+            }
+            if (!title) title = coreTitle || docxStem;
+
+            const flatItems = [];
+            let itemCounter = 0;
+            let imageCounter = 0;
+            const extractedImages = [];
+
+            const titleWords = normalizeForCompare(title).split(" ").filter(Boolean);
+            let titleWordsConsumed = 0;
+            let titleRepeatOpen = titleWords.length > 0;
+
+            for (const child of Array.from(body.children)) {
+                if (child.namespaceURI === OOXML_NS.w && child.localName === "p") {
+                    const p = child;
+                    const text = getParagraphText(p).trim();
+
+                    let alt = "";
+                    for (const d of Array.from(p.getElementsByTagNameNS(OOXML_NS.wp, "docPr"))) {
+                        const descr = (d.getAttribute("descr") || "").trim();
+                        if (descr) { alt = descr; break; }
+                    }
+                    if (!alt) alt = "Article image";
+
+                    for (const blip of Array.from(p.getElementsByTagNameNS(OOXML_NS.a, "blip"))) {
+                        const rId = blip.getAttributeNS(OOXML_NS.r, "embed");
+                        const target = rId ? relsMap[rId] : null;
+                        if (!target) continue;
+
+                        const zipPath = "word/" + target.replace(/^\.?\/+/, "");
+                        const imgEntry = zip.file(zipPath);
+                        if (!imgEntry) continue;
+                        const bytes = await imgEntry.async("uint8array");
+
+                        const extMatch = target.match(/\.[a-zA-Z0-9]+$/);
+                        const ext = extMatch ? extMatch[0].toLowerCase() : ".png";
+
+                        imageCounter += 1;
+                        const filename = `${docxStem}_img${imageCounter}${ext}`;
+
+                        const extentEl = findExtent(blip);
+                        let widthPx = DEFAULT_IMAGE_WIDTH;
+                        if (extentEl) {
+                            const cx = parseInt(extentEl.getAttribute("cx"), 10);
+                            if (!isNaN(cx)) widthPx = Math.round((cx / 914400) * 96);
+                        }
+                        widthPx = Math.min(widthPx, DEFAULT_IMAGE_WIDTH);
+
+                        const placeholderUrl = GITHUB_IMAGE_BASE_URL + filename;
+                        extractedImages.push({ filename, bytes, placeholderUrl });
+
+                        itemCounter += 1;
+                        flatItems.push({
+                            id: `item${itemCounter}`,
+                            kind: "image",
+                            content: `<img src="${placeholderUrl}" alt="${escapeHtml(alt)}" width="${widthPx}" loading="lazy">`,
+                            label: `Image: ${filename}`
+                        });
+                    }
+
+                    if (!text) continue;
+
+                    if (titleRepeatOpen) {
+                        const paraWords = normalizeForCompare(text).split(" ").filter(Boolean);
+                        const n = paraWords.length;
+                        const nextChunk = titleWords.slice(titleWordsConsumed, titleWordsConsumed + n);
+                        const matchesNextChunk = n > 0 && nextChunk.length === n && nextChunk.every((w, i) => w === paraWords[i]);
+
+                        if (matchesNextChunk) {
+                            titleWordsConsumed += n;
+                            if (titleWordsConsumed >= titleWords.length) titleWordsConsumed = 0;
+                            continue;
+                        } else if (isTitleStyle(p)) {
+                            titleWordsConsumed = 0;
+                            continue;
+                        } else {
+                            titleRepeatOpen = false;
+                        }
+                    }
+
+                    const classification = classifyParagraphHeading(p, text, isHeading);
+                    itemCounter += 1;
+                    flatItems.push({
+                        id: `item${itemCounter}`,
+                        kind: "paragraph",
+                        text: text,
+                        originalText: text,
+                        suggestedHeading: classification.heading,
+                        reason: classification.reason
+                    });
+
+                } else if (child.namespaceURI === OOXML_NS.w && child.localName === "tbl") {
+                    itemCounter += 1;
+                    flatItems.push({
+                        id: `item${itemCounter}`,
+                        kind: "table",
+                        content: renderTableBlock(child),
+                        label: "Table"
+                    });
+                }
+            }
+
+            return { title, flatItems, extractedImages, headingMode };
+        }
+
+        async function convertPdfFile(file) {
+            if (typeof pdfjsLib === 'undefined') {
+                throw new Error("PDF.js library failed to load.");
+            }
+            if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+            }
+
+            const arrayBuffer = await file.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+            const pdf = await loadingTask.promise;
+
+            const docStem = file.name.replace(/\.pdf$/i, "");
+            const metadata = await pdf.getMetadata().catch(() => null);
+            let title = metadata?.info?.Title?.trim() || "";
+            if (title && (title.toLowerCase().endsWith(".pdf") || title.toLowerCase().endsWith(".docx") || title.toLowerCase().includes("untitled"))) {
+                title = "";
+            }
+
+            const flatItems = [];
+            let itemCounter = 0;
+            let imageCounter = 0;
+            const extractedImages = [];
+            const cleanText = str => (str || "").replace(/\s+/g, " ").trim();
+            const allTextBlocks = [];
+
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const textContent = await page.getTextContent();
+                const items = textContent.items.filter(it => it.str && it.str.trim());
+                if (items.length) {
+                    items.sort((a, b) => {
+                        const yA = a.transform[5];
+                        const yB = b.transform[5];
+                        if (Math.abs(yA - yB) > 3.5) return yB - yA;
+                        return a.transform[4] - b.transform[4];
+                    });
+
+                    const lines = [];
+                    let currentLine = null;
+
+                    for (const item of items) {
+                        const y = item.transform[5];
+                        const x = item.transform[4];
+                        const fontSize = Math.abs(item.transform[3]) || Math.abs(item.transform[0]) || item.height || 12;
+                        const isBold = /bold|black|heavy|medi/i.test(item.fontName || "");
+
+                        if (!currentLine || Math.abs(currentLine.y - y) > 3.5) {
+                            currentLine = {
+                                y: y,
+                                items: [item],
+                                text: item.str,
+                                fontSize: fontSize,
+                                isBold: isBold,
+                                minX: x,
+                                maxX: x + (item.width || 0)
+                            };
+                            lines.push(currentLine);
+                        } else {
+                            currentLine.items.push(item);
+                            currentLine.text += (item.hasEOL ? "" : " ") + item.str;
+                            currentLine.fontSize = Math.max(currentLine.fontSize, fontSize);
+                            currentLine.isBold = currentLine.isBold || isBold;
+                            currentLine.maxX = Math.max(currentLine.maxX, x + (item.width || 0));
+                        }
+                    }
+
+                    let currentPara = null;
+                    for (const line of lines) {
+                        const lineStr = cleanText(line.text);
+                        if (!lineStr) continue;
+
+                        const isNumbered = looksLikeNumberedHeading(lineStr);
+                        const isHeadingCandidate = line.fontSize >= 13.5 || (line.isBold && lineStr.length < 150) || isNumbered;
+
+                        if (!currentPara) {
+                            currentPara = {
+                                text: lineStr,
+                                fontSize: line.fontSize,
+                                isBold: line.isBold,
+                                isHeading: isHeadingCandidate,
+                                lastY: line.y
+                            };
+                        } else {
+                            const lineGap = Math.abs(currentPara.lastY - line.y);
+                            const sameStyle = Math.abs(currentPara.fontSize - line.fontSize) < 2.5 && currentPara.isBold === line.isBold;
+                            const isNormalGap = lineGap < (line.fontSize * 2.2);
+
+                            if (sameStyle && isNormalGap && !currentPara.isHeading && !isHeadingCandidate) {
+                                currentPara.text += " " + lineStr;
+                                currentPara.lastY = line.y;
+                            } else {
+                                allTextBlocks.push(currentPara);
+                                currentPara = {
+                                    text: lineStr,
+                                    fontSize: line.fontSize,
+                                    isBold: line.isBold,
+                                    isHeading: isHeadingCandidate,
+                                    lastY: line.y
+                                };
+                            }
+                        }
+                    }
+                    if (currentPara) allTextBlocks.push(currentPara);
+                }
+
+                try {
+                    const opList = await page.getOperatorList();
+                    const imgKeys = [];
+                    for (let opIdx = 0; opIdx < opList.fnArray.length; opIdx++) {
+                        const fn = opList.fnArray[opIdx];
+                        const args = opList.argsArray[opIdx];
+                        if (fn === pdfjsLib.OPS.paintImageXObject || fn === pdfjsLib.OPS.paintInlineImageXObject) {
+                            if (args && args[0]) imgKeys.push(args[0]);
+                        }
+                    }
+
+                    for (const imgKey of imgKeys) {
+                        await new Promise((resolve) => {
+                            page.objs.get(imgKey, (img) => {
+                                if (!img) { resolve(); return; }
+                                const canvas = document.createElement("canvas");
+                                canvas.width = img.width || 400;
+                                canvas.height = img.height || 300;
+                                const ctx = canvas.getContext("2d");
+                                if (img.data) {
+                                    let imgData;
+                                    if (img.data.length === img.width * img.height * 4) {
+                                        imgData = new ImageData(new Uint8ClampedArray(img.data), img.width, img.height);
+                                    } else if (img.data.length === img.width * img.height * 3) {
+                                        const rgba = new Uint8ClampedArray(img.width * img.height * 4);
+                                        let j = 0;
+                                        for (let k = 0; k < img.data.length; k += 3) {
+                                            rgba[j] = img.data[k];
+                                            rgba[j+1] = img.data[k+1];
+                                            rgba[j+2] = img.data[k+2];
+                                            rgba[j+3] = 255;
+                                            j += 4;
+                                        }
+                                        imgData = new ImageData(rgba, img.width, img.height);
+                                    }
+                                    if (imgData) ctx.putImageData(imgData, 0, 0);
+                                } else if (img.bitmap) {
+                                    ctx.drawImage(img.bitmap, 0, 0);
+                                } else if (img.src) {
+                                    ctx.drawImage(img, 0, 0);
+                                }
+
+                                canvas.toBlob((blob) => {
+                                    if (blob) {
+                                        const reader = new FileReader();
+                                        reader.onload = () => {
+                                            const bytes = new Uint8Array(reader.result);
+                                            imageCounter += 1;
+                                            const filename = `${docStem}_img${imageCounter}.png`;
+                                            const placeholderUrl = GITHUB_IMAGE_BASE_URL + filename;
+                                            extractedImages.push({ filename, bytes, placeholderUrl });
+
+                                            itemCounter += 1;
+                                            flatItems.push({
+                                                id: `item${itemCounter}`,
+                                                kind: "image",
+                                                content: `<img src="${placeholderUrl}" alt="Article image" width="${Math.min(canvas.width, DEFAULT_IMAGE_WIDTH)}" loading="lazy">`,
+                                                label: `Image: ${filename}`
+                                            });
+                                            resolve();
+                                        };
+                                        reader.readAsArrayBuffer(blob);
+                                    } else {
+                                        resolve();
+                                    }
+                                }, "image/png");
+                            });
+                        });
+                    }
+                } catch (imgErr) {
+                    console.warn("Could not extract image from PDF page:", pageNum, imgErr);
+                }
+            }
+
+            const fontSizes = allTextBlocks.map(b => b.fontSize).filter(Boolean);
+            const avgFontSize = fontSizes.length ? (fontSizes.reduce((a, b) => a + b, 0) / fontSizes.length) : 12;
+
+            for (let i = 0; i < allTextBlocks.length; i++) {
+                const block = allTextBlocks[i];
+                const text = cleanText(block.text);
+                if (!text) continue;
+
+                const isLarge = block.fontSize >= (avgFontSize * 1.25) || block.fontSize >= 15;
+                const isNumbered = looksLikeNumberedHeading(text);
+                const isShort = text.length < 160 && !text.endsWith(".");
+                const isLikelyHeading = (isLarge || (block.isBold && isShort) || isNumbered);
+
+                if (!title && i < 3 && (isLarge || block.fontSize >= 15)) {
+                    title = text;
+                    continue;
+                }
+
+                itemCounter += 1;
+                flatItems.push({
+                    id: `item${itemCounter}`,
+                    kind: "paragraph",
+                    text: text,
+                    originalText: text,
+                    suggestedHeading: isLikelyHeading,
+                    reason: isNumbered ? "numbered heading" : (isLarge ? "larger font" : (block.isBold ? "bold font" : "paragraph"))
+                });
+            }
+
+            if (!title) title = docStem;
+            return { title, flatItems, extractedImages, headingMode: "pdf" };
+        }
+
+        function buildSectionsFromFlatItems(flatItems, headingIds) {
+            const sections = [];
+            let current = null;
+            function ensureCurrent() {
+                if (!current) { current = { title: null, blocks: [] }; sections.push(current); }
+                return current;
+            }
+
+            for (const item of flatItems) {
+                if (item.kind === "paragraph") {
+                    if (headingIds.has(item.id)) {
+                        current = { title: item.text, blocks: [] };
+                        sections.push(current);
+                    } else {
+                        ensureCurrent().blocks.push({ kind: "text", content: item.text });
+                    }
+                } else if (item.kind === "image") {
+                    ensureCurrent().blocks.push({ kind: "image", content: item.content });
+                } else if (item.kind === "table") {
+                    ensureCurrent().blocks.push({ kind: "table", content: item.content });
+                }
+            }
+            return sections;
+        }
+
+        // =========================================================================
+        // 4. STRUCTURE EDITOR & LIVE PREVIEW SYNC
+        // =========================================================================
+        function initHeadingState(parse) {
+            const state = {};
+            for (const item of parse.flatItems) {
+                if (item.kind === "paragraph") state[item.id] = item.suggestedHeading;
+            }
+            parse.headingState = state;
+            parse.editingItemId = null;
+            parse.collapsedState = {};
+        }
+
+        function renderStructureReview(parse) {
+            if (!parse.headingState) initHeadingState(parse);
+            document.getElementById("reviewTitleInput").value = parse.title;
+            renderGroupedStructureList(parse);
+            updateLivePreview();
+        }
+
+        function renderGroupedStructureList(parse) {
+            const listEl = document.getElementById("structureList");
+            listEl.innerHTML = "";
+
+            const groups = [];
+            let currentGroup = { headerItem: null, bodyItems: [] };
+            groups.push(currentGroup);
+
+            for (const item of parse.flatItems) {
+                const isSectionHeader = item.kind === "paragraph" && !!parse.headingState[item.id];
+                if (isSectionHeader) {
+                    currentGroup = { headerItem: item, bodyItems: [] };
+                    groups.push(currentGroup);
+                } else {
+                    currentGroup.bodyItems.push(item);
+                }
+            }
+
+            let sectionNumber = 0;
+            for (const group of groups) {
+                const isIntro = group.headerItem === null;
+                if (isIntro && group.bodyItems.length === 0) continue;
+
+                const card = document.createElement("div");
+                card.className = "section-card" + (isIntro ? " section-intro-card" : "");
+
+                if (!isIntro) sectionNumber += 1;
+                const headerItemId = group.headerItem ? group.headerItem.id : "_intro";
+                const isCollapsed = isIntro ? false : (parse.collapsedState[headerItemId] === true);
+
+                const labelBar = document.createElement("div");
+                labelBar.className = "section-header-bar";
+                const paraCount = group.bodyItems.filter(i => i.kind === "paragraph").length;
+                const imgCount = group.bodyItems.filter(i => i.kind === "image").length;
+                const tblCount = group.bodyItems.filter(i => i.kind === "table").length;
+                const counts = [];
+                if (paraCount) counts.push(`${paraCount} para${paraCount > 1 ? "s" : ""}`);
+                if (imgCount) counts.push(`${imgCount} img${imgCount > 1 ? "s" : ""}`);
+                if (tblCount) counts.push(`${tblCount} tbl${tblCount > 1 ? "s" : ""}`);
+                const countText = counts.length ? ` (${counts.join(", ")})` : "";
+
+                labelBar.innerHTML = `
+                    <span>${isIntro ? "Intro Content" : `Section ${sectionNumber}`}${countText}</span>
+                    <span style="font-size: 0.75rem;">${isCollapsed ? "▶" : "▼"}</span>
+                `;
+
+                if (!isIntro) {
+                    labelBar.addEventListener("click", () => {
+                        parse.collapsedState[headerItemId] = !isCollapsed;
+                        renderGroupedStructureList(parse);
+                    });
+                }
+                card.appendChild(labelBar);
+
+                if (!isIntro) {
+                    card.appendChild(buildParagraphRow(parse, group.headerItem, true));
+                }
+
+                const bodyContainer = document.createElement("div");
+                bodyContainer.style.display = isCollapsed ? "none" : "block";
+
+                for (const item of group.bodyItems) {
+                    if (item.kind === "paragraph") {
+                        bodyContainer.appendChild(buildParagraphRow(parse, item, false));
+                    } else {
+                        bodyContainer.appendChild(buildStaticItemRow(item));
+                    }
+                }
+                card.appendChild(bodyContainer);
+                listEl.appendChild(card);
+            }
+
+            const totalSections = groups.filter(g => g.headerItem !== null).length;
+            document.getElementById("structureStatsBadge").textContent = `${totalSections} section${totalSections === 1 ? "" : "s"}`;
+        }
+
+        function buildParagraphRow(parse, item, isSectionHeader) {
+            const row = document.createElement("div");
+            row.className = "section-item-row" + (isSectionHeader ? " is-heading" : "");
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.className = "item-checkbox";
+            checkbox.checked = isSectionHeader;
+            checkbox.title = "Toggle Section Header";
+            checkbox.addEventListener("change", () => {
+                parse.headingState[item.id] = checkbox.checked;
+                renderGroupedStructureList(parse);
+                updateLivePreview();
+            });
+            row.appendChild(checkbox);
+
+            const body = document.createElement("div");
+            body.className = "item-body";
+
+            const isEditing = parse.editingItemId === item.id;
+
+            if (isEditing) {
+                const editContainer = document.createElement("div");
+                editContainer.className = "item-edit-container";
+
+                const editInput = document.createElement("textarea");
+                editInput.className = "input-text";
+                editInput.value = item.text;
+                editInput.rows = item.text.length > 80 ? 3 : 2;
+                editInput.style.padding = "6px 8px";
+                editInput.style.fontSize = "0.86rem";
+                editInput.style.lineHeight = "1.4";
+                editInput.style.resize = "vertical";
+
+                const originalTextBeforeEdit = item.text;
+
+                // Live real-time preview sync on every keystroke / delete
+                editInput.addEventListener("input", () => {
+                    item.text = editInput.value;
+                    updateLivePreview();
+                });
+
+                const saveEdit = () => {
+                    const newVal = editInput.value.trim();
+                    item.text = newVal || originalTextBeforeEdit;
+                    parse.editingItemId = null;
+                    renderGroupedStructureList(parse);
+                    updateLivePreview();
+                };
+
+                const cancelEdit = () => {
+                    item.text = originalTextBeforeEdit;
+                    parse.editingItemId = null;
+                    renderGroupedStructureList(parse);
+                    updateLivePreview();
+                };
+
+                editInput.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        saveEdit();
+                    } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        cancelEdit();
+                    }
+                });
+
+                const actionsRow = document.createElement("div");
+                actionsRow.className = "item-edit-actions";
+
+                const saveBtn = document.createElement("button");
+                saveBtn.type = "button";
+                saveBtn.className = "btn-edit-save";
+                saveBtn.textContent = "✓ Save";
+                saveBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    saveEdit();
+                });
+
+                const cancelBtn = document.createElement("button");
+                cancelBtn.type = "button";
+                cancelBtn.className = "btn-edit-cancel";
+                cancelBtn.textContent = "✕ Cancel";
+                cancelBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    cancelEdit();
+                });
+
+                const hintSpan = document.createElement("span");
+                hintSpan.style.fontSize = "0.72rem";
+                hintSpan.style.color = "var(--text-muted)";
+                hintSpan.textContent = "(Enter to save, Esc to cancel)";
+
+                actionsRow.appendChild(saveBtn);
+                actionsRow.appendChild(cancelBtn);
+                actionsRow.appendChild(hintSpan);
+
+                editContainer.appendChild(editInput);
+                editContainer.appendChild(actionsRow);
+                body.appendChild(editContainer);
+
+                setTimeout(() => {
+                    editInput.focus();
+                    editInput.setSelectionRange(editInput.value.length, editInput.value.length);
+                }, 0);
+            } else {
+                const textDiv = document.createElement("div");
+                textDiv.className = "item-text";
+                textDiv.textContent = item.text;
+                body.appendChild(textDiv);
+
+                const badgeRow = document.createElement("div");
+                badgeRow.className = "item-badge-row";
+
+                const badge = document.createElement("span");
+                const wasAuto = item.suggestedHeading;
+                if (isSectionHeader && !wasAuto) {
+                    badge.className = "pill-badge user-heading";
+                    badge.textContent = "User-Promoted Header";
+                } else if (isSectionHeader) {
+                    badge.className = "pill-badge auto-heading";
+                    badge.textContent = `Auto Header (${item.reason})`;
+                } else {
+                    badge.className = "pill-badge paragraph";
+                    badge.textContent = "Paragraph";
+                }
+                badgeRow.appendChild(badge);
+
+                const editBtn = document.createElement("button");
+                editBtn.type = "button";
+                editBtn.className = "item-btn-edit";
+                editBtn.textContent = "✏ Edit";
+                editBtn.title = "Edit text";
+                editBtn.addEventListener("click", () => {
+                    parse.editingItemId = item.id;
+                    renderGroupedStructureList(parse);
+                });
+                badgeRow.appendChild(editBtn);
+
+                body.appendChild(badgeRow);
+            }
+
+            row.appendChild(body);
+            return row;
+        }
+
+        function buildStaticItemRow(item) {
+            const row = document.createElement("div");
+            row.className = "section-item-row";
+
+            const icon = document.createElement("span");
+            icon.textContent = item.kind === "image" ? "🖼" : "📊";
+            icon.style.fontSize = "16px";
+            row.appendChild(icon);
+
+            const body = document.createElement("div");
+            body.className = "item-body";
+            body.innerHTML = `
+                <div class="item-text" style="color: var(--text-muted); font-size: 0.85rem;">${escapeHtml(item.label || item.kind.toUpperCase())}</div>
+                <div class="item-badge-row"><span class="pill-badge media">${item.kind.toUpperCase()}</span></div>
+            `;
+            row.appendChild(body);
+            return row;
+        }
+
+        function updateLivePreview() {
+            if (!pendingParse) return;
+
+            const headingIds = new Set(
+                Object.keys(pendingParse.headingState).filter(id => pendingParse.headingState[id])
+            );
+
+            const currentTitle = (document.getElementById("reviewTitleInput").value || "").trim() || pendingParse.title;
+            const sections = buildSectionsFromFlatItems(pendingParse.flatItems, headingIds);
+            let renderedContent = renderContentHtml(sections);
+
+            // Replace image placeholders with data URLs if pending
+            if (pendingParse.extractedImages && pendingParse.extractedImages.length > 0) {
+                for (const img of pendingParse.extractedImages) {
+                    if (img.bytes) {
+                        const mime = getMimeType(img.filename);
+                        const b64 = bytesToBase64(img.bytes);
+                        renderedContent = renderedContent.replaceAll(img.placeholderUrl, `data:${mime};base64,${b64}`);
+                    }
+                }
+            }
+
+            const cleanContent = typeof DOMPurify !== 'undefined'
+                ? DOMPurify.sanitize(renderedContent, { FORBID_ATTR: ['style'], ADD_ATTR: ['target', 'data-backup', 'onerror'] })
+                : renderedContent;
+
+            const readTime = calculateReadTime(cleanContent);
+            loadedArticle = { title: currentTitle, content: cleanContent, readTime: readTime };
+            pendingImages = pendingParse.extractedImages || [];
+
+            // Update UI elements
+            document.getElementById("livePreviewTitle").textContent = currentTitle;
+            document.getElementById("livePreviewMeta").innerHTML = `Source: ${escapeHtml(docxStemForDownload)} &nbsp;|&nbsp; ${readTime} min read &nbsp;|&nbsp; RM Times Direct Publisher`;
+            document.getElementById("livePreviewBody").innerHTML = cleanContent;
+            document.getElementById("liveReadTimeLabel").textContent = `⏱ ~${readTime} min read`;
+            document.getElementById("headerPreviewBtn").style.display = "inline-flex";
+
+            // Update Hero preview in live card
+            const heroContainer = document.getElementById("liveHeroImageContainer");
+            if (heroImageBlobData && heroImageBlobData.dataUrl) {
+                heroContainer.innerHTML = `<img src="${heroImageBlobData.dataUrl}" alt="Hero Image" style="width: 100%; max-height: 380px; object-fit: cover; border-radius: var(--radius-sm); margin-bottom: 20px; box-shadow: var(--shadow-sm);">`;
+            } else {
+                heroContainer.innerHTML = "";
+            }
+        }
+
+        document.getElementById("reviewTitleInput").addEventListener("input", () => {
+            if (pendingParse) {
+                pendingParse.title = document.getElementById("reviewTitleInput").value;
+                updateLivePreview();
+            }
+        });
+
+        document.getElementById("collapseAllBtn").addEventListener("click", () => {
+            if (!pendingParse) return;
+            for (const id of Object.keys(pendingParse.headingState)) {
+                if (pendingParse.headingState[id]) pendingParse.collapsedState[id] = true;
+            }
+            renderGroupedStructureList(pendingParse);
+        });
+
+        document.getElementById("expandAllBtn").addEventListener("click", () => {
+            if (!pendingParse) return;
+            for (const id of Object.keys(pendingParse.headingState)) {
+                if (pendingParse.headingState[id]) pendingParse.collapsedState[id] = false;
+            }
+            renderGroupedStructureList(pendingParse);
+        });
+
+        document.getElementById("resetStructureBtn").addEventListener("click", () => {
+            if (!pendingParse) return;
+            for (const item of pendingParse.flatItems) {
+                if (item.kind === "paragraph") item.text = item.originalText;
+            }
+            initHeadingState(pendingParse);
+            renderGroupedStructureList(pendingParse);
+            updateLivePreview();
+            showToast("Reset structure to original auto-detected headings.", "info");
+        });
+
+        function confirmAndProceedToPublish() {
+            updateLivePreview();
+            goToStep(3);
+            showToast("Structure verified. Ready for blockchain publication.", "success");
+        }
+
+        // =========================================================================
+        // 5. HERO IMAGE PROCESSING & OPTIMIZATION (16:9 & <100KB THUMBNAIL)
+        // =========================================================================
+        async function processHeroImage(file) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const url = URL.createObjectURL(file);
+                img.onload = async () => {
+                    try {
+                        URL.revokeObjectURL(url);
+                        const mainCanvas = document.createElement("canvas");
+                        mainCanvas.width = 800;
+                        mainCanvas.height = 450;
+                        const mainCtx = mainCanvas.getContext("2d");
+
+                        const targetRatio = 800 / 450;
+                        const imgRatio = img.width / img.height;
+                        let srcX = 0, srcY = 0, srcW = img.width, srcH = img.height;
+
+                        if (imgRatio > targetRatio) {
+                            srcW = img.height * targetRatio;
+                            srcX = (img.width - srcW) / 2;
+                        } else {
+                            srcH = img.width / targetRatio;
+                            srcY = (img.height - srcH) / 2;
+                        }
+                        mainCtx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, 800, 450);
+
+                        const mainBytes = await new Promise((res) => {
+                            mainCanvas.toBlob((b) => {
+                                const r = new FileReader();
+                                r.onload = () => res(new Uint8Array(r.result));
+                                r.readAsArrayBuffer(b);
+                            }, "image/jpeg", 0.90);
+                        });
+
+                        const thumbCanvas = document.createElement("canvas");
+                        thumbCanvas.width = 400;
+                        thumbCanvas.height = 225;
+                        const thumbCtx = thumbCanvas.getContext("2d");
+                        thumbCtx.drawImage(mainCanvas, 0, 0, 400, 225);
+
+                        let quality = 0.85;
+                        let thumbBytes = null;
+                        while (quality > 0.3) {
+                            thumbBytes = await new Promise((res) => {
+                                thumbCanvas.toBlob((b) => {
+                                    const r = new FileReader();
+                                    r.onload = () => res(new Uint8Array(r.result));
+                                    r.readAsArrayBuffer(b);
+                                }, "image/jpeg", quality);
+                            });
+                            if (thumbBytes.length <= 100 * 1024) break;
+                            quality -= 0.15;
+                        }
+
+                        const mainSizeKb = (mainBytes.length / 1024).toFixed(1);
+                        const thumbSizeKb = (thumbBytes.length / 1024).toFixed(1);
+                        const dataUrl = mainCanvas.toDataURL("image/jpeg", 0.90);
+
+                        resolve({ mainBytes, thumbBytes, mainSizeKb, thumbSizeKb, dataUrl });
+                    } catch (e) {
+                        reject(e);
+                    }
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error("Could not decode hero image."));
+                };
+                img.src = url;
+            });
+        }
+
+        document.getElementById("heroImageFileInput").addEventListener("change", async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+
+            try {
+                const processed = await processHeroImage(file);
+                heroImageBlobData = processed;
+
+                const previewEl = document.getElementById("heroBannerPreview");
+                previewEl.innerHTML = `<img src="${processed.dataUrl}" alt="Hero Preview">`;
+
+                document.getElementById("heroImageStatusBadge").textContent = `✓ ${file.name}`;
+                document.getElementById("heroImageStatusBadge").style.color = "var(--success)";
+                document.getElementById("heroStatsRow").style.display = "flex";
+                document.getElementById("heroStatsMain").textContent = `Main: 800x450 (${processed.mainSizeKb} KB)`;
+                document.getElementById("heroStatsThumb").textContent = `Thumb: 400x225 (${processed.thumbSizeKb} KB)`;
+
+                updateLivePreview();
+                showToast("Hero image cropped (16:9) and optimized.", "success");
+            } catch (err) {
+                console.error("Hero processing error:", err);
+                showToast("Failed to process hero image: " + err.message, "error");
+            }
+        });
+
+        // =========================================================================
+        // 6. UPLOAD REGISTRY & STORAGE INTEGRATIONS
+        // =========================================================================
+        function getLocalRegistry() {
+            try {
+                const stored = localStorage.getItem("rmtimes_image_registry");
+                return stored ? JSON.parse(stored) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveLocalRegistryEntry(hash, filename, cloudinaryUrl, gdriveUrl) {
+            try {
+                const registry = getLocalRegistry();
+                const existing = registry[hash] || {};
+                registry[hash] = {
+                    filename: filename,
+                    firstUploaded: existing.firstUploaded || new Date().toISOString(),
+                    lastReused: new Date().toISOString(),
+                    usageCount: (existing.usageCount || 1) + (existing.firstUploaded ? 1 : 0),
+                    providers: {
+                        cloudinary: cloudinaryUrl || existing.providers?.cloudinary || "",
+                        gdrive: gdriveUrl || existing.providers?.gdrive || ""
+                    }
+                };
+                localStorage.setItem("rmtimes_image_registry", JSON.stringify(registry));
+            } catch (e) {
+                console.warn("Failed to save local registry:", e);
+            }
+        }
+
+        async function checkGoogleDriveRegistry(imageHash) {
+            const localRegistry = getLocalRegistry();
+            if (localRegistry[imageHash]) {
+                const entry = localRegistry[imageHash];
+                entry.usageCount = (entry.usageCount || 1) + 1;
+                entry.lastReused = new Date().toISOString();
+                try { localStorage.setItem("rmtimes_image_registry", JSON.stringify(localRegistry)); } catch (e) {}
+                return {
+                    exists: true,
+                    source: "localCache",
+                    hash: imageHash,
+                    primaryUrl: entry.providers?.cloudinary || "",
+                    fallbackUrl: entry.providers?.gdrive || "",
+                    usageCount: entry.usageCount
+                };
+            }
+
+            try {
+                const res = await fetch(GDRIVE_APPS_SCRIPT_URL, {
+                    method: "POST",
+                    redirect: "follow",
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    body: JSON.stringify({ action: "checkHash", hash: imageHash })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.exists) {
+                        data.source = "serverRegistry";
+                        saveLocalRegistryEntry(imageHash, data.filename || "image", data.primaryUrl, data.fallbackUrl);
+                        return data;
+                    }
+                }
+            } catch (err) {
+                console.warn("Server registry check error:", err);
+            }
+            return { exists: false };
+        }
+
+        async function cloudinaryUploadFile(bytes, filename) {
+            const mimeType = getMimeType(filename);
+            const blob = new Blob([bytes], { type: mimeType });
+            const fd = new FormData();
+            fd.append("file", blob, filename);
+            fd.append("upload_preset", CLOUDINARY_PRESET);
+
+            const res = await fetch(CLOUDINARY_URL, { method: "POST", body: fd });
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Cloudinary upload failed: ${errText.slice(0, 150)}`);
+            }
+            const data = await res.json();
+            if (!data.secure_url) throw new Error("Missing Cloudinary secure_url");
+            return data.secure_url;
+        }
+
+        async function googleDriveAppsScriptUpload(bytes, filename, imageHash, cloudinaryUrl) {
+            const mimeType = getMimeType(filename);
+            const base64Data = bytesToBase64(bytes);
+
+            const res = await fetch(GDRIVE_APPS_SCRIPT_URL, {
+                method: "POST",
+                redirect: "follow",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({
+                    action: "upload",
+                    fileName: filename,
+                    mimeType: mimeType,
+                    base64: base64Data,
+                    hash: imageHash || "",
+                    cloudinaryUrl: cloudinaryUrl || ""
+                })
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Google Drive upload failed: ${errText.slice(0, 150)}`);
+            }
+            const data = await res.json();
+            if (!data.success || !data.url) throw new Error(data.error || "Google Drive upload failed");
+            if (imageHash) saveLocalRegistryEntry(imageHash, filename, cloudinaryUrl, data.url);
+            return data.url;
+        }
+
+        async function githubCheckSha(repoPath, token) {
+            const res = await fetch(
+                `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${repoPath}?ref=${GITHUB_BRANCH}`,
+                { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } }
+            );
+            if (res.status === 404) return null;
+            if (!res.ok) throw new Error(`GitHub check failed: ${res.status}`);
+            const data = await res.json();
+            return data.sha || null;
+        }
+
+        async function githubUploadFile(bytes, filename, token) {
+            const repoPath = `${GITHUB_REPO_IMAGE_PATH}/${filename}`;
+            const sha = await githubCheckSha(repoPath, token);
+            const body = {
+                message: `Add/update article image ${filename}`,
+                content: bytesToBase64(bytes),
+                branch: GITHUB_BRANCH
+            };
+            if (sha) body.sha = sha;
+
+            const res = await fetch(
+                `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${repoPath}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: "application/vnd.github+json",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(body)
+                }
+            );
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`${res.status} ${errText.slice(0, 150)}`);
+            }
+        }
+
+        // =========================================================================
+        // 7. FILE DRAG-AND-DROP, INGESTION & TEXT PARSING
+        // =========================================================================
+        const dropzone = document.getElementById("dropzoneEl");
+        const fileInput = document.getElementById("articleFileInput");
+
+        ['dragenter', 'dragover'].forEach(name => {
+            dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.add("dragover"); });
+        });
+
+        ['dragleave', 'drop'].forEach(name => {
+            dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.remove("dragover"); });
+        });
+
+        dropzone.addEventListener("drop", (e) => {
+            const dt = e.dataTransfer;
+            const file = dt && dt.files && dt.files[0];
+            if (file) handleFileSelection(file);
+        });
+
+        fileInput.addEventListener("change", (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (file) handleFileSelection(file);
+        });
+
+        async function handleFileSelection(file) {
+            const parsingCard = document.getElementById("parsingCard");
+            const parsingTitle = document.getElementById("parsingTitle");
+            const parsingDetails = document.getElementById("parsingDetails");
+
+            parsingCard.style.display = "flex";
+            parsingTitle.textContent = `Parsing "${file.name}"...`;
+            parsingDetails.textContent = "Extracting sections, inline media, and metadata...";
+
+            docxStemForDownload = file.name.replace(/\.(docx|pdf|txt|md|text)$/i, "");
+            const isPdf = /\.pdf$/i.test(file.name);
+            const isText = /\.(txt|md|text)$/i.test(file.name);
+
+            try {
+                let result;
+                if (isText) {
+                    const textContent = await file.text();
+                    result = convertRawText(textContent, docxStemForDownload);
+                } else if (isPdf) {
+                    result = await convertPdfFile(file);
+                } else {
+                    result = await convertDocxFile(file);
+                }
+
+                pendingParse = result;
+                parsingCard.style.display = "none";
+
+                renderStructureReview(result);
+                goToStep(2);
+                showToast(`Successfully extracted "${result.title}"`, "success");
+            } catch (err) {
+                console.error("Parse error:", err);
+                parsingCard.style.display = "none";
+                showCustomModal({
+                    title: "Document Parsing Failed",
+                    message: `Could not parse <b>${escapeHtml(file.name)}</b>.<br><br>Error: <i>${escapeHtml(err.message)}</i>`
+                });
+            }
+        }
+
+        function parsePastedRawText() {
+            const rawText = document.getElementById("rawTextInput").value;
+            const customTitle = document.getElementById("pasteTitleInput").value;
+
+            if (!rawText || !rawText.trim()) {
+                showToast("Please paste or type some text first.", "error");
+                document.getElementById("rawTextInput").focus();
+                return;
+            }
+
+            try {
+                docxStemForDownload = customTitle.trim() || "Pasted_Article";
+                const result = convertRawText(rawText, customTitle);
+                pendingParse = result;
+                renderStructureReview(result);
+                goToStep(2);
+                showToast(`Successfully loaded "${result.title}"`, "success");
+            } catch (err) {
+                showToast("Error: " + err.message, "error");
+            }
+        }
+
+        // =========================================================================
+        // 8. MAIN PUBLISHING ROUTINE (WITH PROGRESS BAR & NODE DISPATCH)
+        // =========================================================================
+        async function publishDirectUserContent() {
+            const publishBtn = document.getElementById("publishSubmitBtn");
+            const privKeyInput = document.getElementById("floPrivateKeyInput");
+            const rawKey = privKeyInput.value.trim();
+
+            if (!loadedArticle) {
+                showToast("Please upload and confirm an article first.", "error");
+                return;
+            }
+
+            if (!rawKey) {
+                showToast("Please enter your FLO Private Key (WIF).", "error");
+                privKeyInput.focus();
+                return;
+            }
+
+            let myFloID = null;
+            try {
+                myFloID = floCrypto.getAddress(rawKey);
+                if (!myFloID) throw new Error("Invalid WIF key");
+            } catch (e) {
+                showToast("Invalid FLO Private Key format.", "error");
+                return;
+            }
+
+            const isSubadmin = document.querySelector('input[name="publisherRole"]:checked').value === "subadmin";
+            const githubTokenInput = document.getElementById("githubTokenInput");
+            const githubToken = githubTokenInput ? githubTokenInput.value.trim() : "";
+
+            if (isSubadmin && pendingImages.length > 0 && !githubToken) {
+                const proceedWithoutToken = await showCustomModal({
+                    title: "Missing GitHub Token",
+                    message: `You selected Subadmin mode with ${pendingImages.length} image(s), but did not provide a GitHub token.<br><br>Do you want to proceed anyway (image links will be broken)?`,
+                    confirmText: "Publish Anyway",
+                    cancelText: "Go Back"
+                });
+                if (!proceedWithoutToken) return;
+            }
+
+            try {
+                publishBtn.disabled = true;
+                publishBtn.textContent = "Publishing to RanchiMall Times...";
+                document.getElementById("logOutput").textContent = "";
+
+                updateProgress(10, "Authenticating session and verifying credentials...");
+                logToScreen(`[System] Initializing session for: ${myFloID}`);
+                logToScreen(`[System] Role: ${isSubadmin ? "Subadmin (GitHub Storage)" : "General User (Cloudinary + Google Drive Dual Upload)"}`);
+
+                floCloudAPI.user(myFloID, rawKey);
+                floGlobals.myFloID = myFloID;
+
+                const contributorsInput = document.getElementById("contributorsInput").value;
+                const contributors = parseContributors(contributorsInput, myFloID);
+                logToScreen(`[System] Contributors: ${contributors.join(", ")}`);
+
+                const { title: articleTitle, readTime } = loadedArticle;
+                let articleContent = loadedArticle.content;
+                const totalImages = pendingImages.length;
+
+                // Handle Embedded Images
+                if (totalImages > 0) {
+                    updateProgress(25, `Handling ${totalImages} embedded image(s)...`);
+                    let failures = 0;
+                    let idx = 0;
+
+                    for (const img of pendingImages) {
+                        idx += 1;
+                        const pct = 25 + Math.round((idx / totalImages) * 35);
+                        updateProgress(pct, `Uploading image ${idx} of ${totalImages}...`);
+
+                        if (isSubadmin) {
+                            if (githubToken) {
+                                try {
+                                    const repoPath = `${GITHUB_REPO_IMAGE_PATH}/${img.filename}`;
+                                    const sha = await githubCheckSha(repoPath, githubToken);
+                                    if (sha) {
+                                        logToScreen(`  [SKIPPED] "${img.filename}" already exists on GitHub. Reusing URL.`);
+                                    } else {
+                                        await githubUploadFile(img.bytes, img.filename, githubToken);
+                                        logToScreen(`  [Uploaded to GitHub] ${img.filename}`);
+                                    }
+                                } catch (err) {
+                                    failures += 1;
+                                    logToScreen(`  [ERROR] GitHub upload failed for ${img.filename}: ${err.message}`);
+                                }
+                            }
+                        } else {
+                            try {
+                                const imageHash = await calculateSha256Hex(img.bytes);
+                                const registryResult = await checkGoogleDriveRegistry(imageHash);
+
+                                if (registryResult && registryResult.exists) {
+                                    const primaryUrl = registryResult.primaryUrl || (registryResult.providers && registryResult.providers.cloudinary) || "";
+                                    const fallbackUrl = registryResult.fallbackUrl || (registryResult.providers && registryResult.providers.gdrive) || "";
+
+                                    logToScreen(`  [DEDUPLICATED] "${img.filename}" reused from registry.`);
+                                    if (primaryUrl && fallbackUrl) {
+                                        const replacement = `${primaryUrl}" data-backup="${fallbackUrl}" onerror="this.onerror=null;if(this.dataset.backup){this.src=this.dataset.backup;}`;
+                                        articleContent = articleContent.replaceAll(img.placeholderUrl, replacement);
+                                    } else if (primaryUrl) {
+                                        articleContent = articleContent.replaceAll(img.placeholderUrl, primaryUrl);
+                                    } else if (fallbackUrl) {
+                                        articleContent = articleContent.replaceAll(img.placeholderUrl, fallbackUrl);
+                                    }
+                                    continue;
+                                }
+
+                                let cloudinaryUrl = null, gdriveUrl = null;
+                                try {
+                                    cloudinaryUrl = await cloudinaryUploadFile(img.bytes, img.filename);
+                                    logToScreen(`    [1/2] Cloudinary upload: ${cloudinaryUrl}`);
+                                } catch (e) {
+                                    logToScreen(`    [WARNING] Cloudinary failed: ${e.message}`);
+                                }
+
+                                try {
+                                    gdriveUrl = await googleDriveAppsScriptUpload(img.bytes, img.filename, imageHash, cloudinaryUrl);
+                                    logToScreen(`    [2/2] Google Drive upload: ${gdriveUrl}`);
+                                } catch (e) {
+                                    logToScreen(`    [WARNING] Google Drive failed: ${e.message}`);
+                                }
+
+                                if (cloudinaryUrl && gdriveUrl) {
+                                    const replacement = `${cloudinaryUrl}" data-backup="${gdriveUrl}" onerror="this.onerror=null;if(this.dataset.backup){this.src=this.dataset.backup;}`;
+                                    articleContent = articleContent.replaceAll(img.placeholderUrl, replacement);
+                                } else if (cloudinaryUrl) {
+                                    articleContent = articleContent.replaceAll(img.placeholderUrl, cloudinaryUrl);
+                                } else if (gdriveUrl) {
+                                    articleContent = articleContent.replaceAll(img.placeholderUrl, gdriveUrl);
+                                } else {
+                                    failures += 1;
+                                }
+                            } catch (imgErr) {
+                                failures += 1;
+                                logToScreen(`  [ERROR] Processing ${img.filename}: ${imgErr.message}`);
+                            }
+                        }
+                    }
+
+                    if (failures > 0) {
+                        const proceed = await showCustomModal({
+                            title: "Image Upload Warnings",
+                            message: `${failures} of ${totalImages} image(s) failed to upload.<br><br>Do you want to proceed with publishing?`,
+                            confirmText: "Proceed Anyway",
+                            cancelText: "Cancel"
+                        });
+                        if (!proceed) {
+                            publishBtn.disabled = false;
+                            publishBtn.textContent = "Send Publishing Request to RanchiMall Times";
+                            return;
+                        }
+                    }
+                }
+
+                // Handle Hero Image Upload
+                let uploadedHeroImage = null;
+                const heroInput = document.getElementById("heroImageFileInput");
+                const heroFile = heroInput && heroInput.files && heroInput.files[0];
+
+                if (heroFile && heroImageBlobData) {
+                    updateProgress(65, "Processing & uploading Hero Image...");
+                    logToScreen(`[System] Uploading Hero Image: "${heroFile.name}"...`);
+
+                    const { mainBytes, thumbBytes, mainSizeKb, thumbSizeKb } = heroImageBlobData;
+                    const mainHash = await calculateSha256Hex(mainBytes);
+                    const thumbHash = await calculateSha256Hex(thumbBytes);
+
+                    const stem = heroFile.name.replace(/\.[^/.]+$/, "").replace(/\s+/g, '_');
+                    const mainFilename = `hero_${stem}_800x450.jpg`;
+                    const thumbFilename = `hero_${stem}_thumb.jpg`;
+
+                    let mainCloudinaryUrl = "", mainGdriveUrl = "";
+                    let thumbCloudinaryUrl = "", thumbGdriveUrl = "";
+
+                    if (isSubadmin && githubToken) {
+                        const mainRepoPath = `${GITHUB_REPO_IMAGE_PATH}/${mainFilename}`;
+                        if (!await githubCheckSha(mainRepoPath, githubToken)) {
+                            await githubUploadFile(mainBytes, mainFilename, githubToken);
+                        }
+                        mainCloudinaryUrl = GITHUB_IMAGE_BASE_URL + mainFilename;
+                        mainGdriveUrl = mainCloudinaryUrl;
+
+                        const thumbRepoPath = `${GITHUB_REPO_IMAGE_PATH}/${thumbFilename}`;
+                        if (!await githubCheckSha(thumbRepoPath, githubToken)) {
+                            await githubUploadFile(thumbBytes, thumbFilename, githubToken);
+                        }
+                        thumbCloudinaryUrl = GITHUB_IMAGE_BASE_URL + thumbFilename;
+                        thumbGdriveUrl = thumbCloudinaryUrl;
+                    } else {
+                        const mainReg = await checkGoogleDriveRegistry(mainHash);
+                        if (mainReg && mainReg.exists) {
+                            mainCloudinaryUrl = mainReg.primaryUrl || (mainReg.providers && mainReg.providers.cloudinary) || "";
+                            mainGdriveUrl = mainReg.fallbackUrl || (mainReg.providers && mainReg.providers.gdrive) || "";
+                        } else {
+                            mainCloudinaryUrl = await cloudinaryUploadFile(mainBytes, mainFilename);
+                            mainGdriveUrl = await googleDriveAppsScriptUpload(mainBytes, mainFilename, mainHash, mainCloudinaryUrl);
+                        }
+
+                        const thumbReg = await checkGoogleDriveRegistry(thumbHash);
+                        if (thumbReg && thumbReg.exists) {
+                            thumbCloudinaryUrl = thumbReg.primaryUrl || (thumbReg.providers && thumbReg.providers.cloudinary) || "";
+                            thumbGdriveUrl = thumbReg.fallbackUrl || (thumbReg.providers && thumbReg.providers.gdrive) || "";
+                        } else {
+                            thumbCloudinaryUrl = await cloudinaryUploadFile(thumbBytes, thumbFilename);
+                            thumbGdriveUrl = await googleDriveAppsScriptUpload(thumbBytes, thumbFilename, thumbHash, thumbCloudinaryUrl);
+                        }
+                    }
+
+                    uploadedHeroImage = {
+                        cloudinaryUrl: mainCloudinaryUrl,
+                        gdriveUrl: mainGdriveUrl,
+                        filename: mainFilename,
+                        thumbnailCloudinaryUrl: thumbCloudinaryUrl,
+                        thumbnailGdriveUrl: thumbGdriveUrl,
+                        thumbnailFilename: thumbFilename,
+                        thumbSizeKb: thumbSizeKb
+                    };
+                }
+
+                // SuperNodes Initialization & Payload Dispatch
+                updateProgress(80, "Connecting to Flo SuperNodes...");
+                logToScreen("[System] Initializing SuperNodes connection...");
+                await floCloudAPI.init(supernodesList);
+
+                updateProgress(90, "Dispatching payload to RanchiMall Times...");
+                const articleID = floCrypto.randString(16, true);
+                logToScreen(`[System] Generated Article ID: ${articleID}`);
+
+                const payload = {
+                    articleID: articleID,
+                    title: articleTitle,
+                    content: articleContent,
+                    readTime: readTime,
+                    contributors: contributors
+                };
+                if (uploadedHeroImage) payload.heroImage = uploadedHeroImage;
+
+                const res = await floCloudAPI.sendGeneralData(payload, 'publishing_requests', {
+                    application: 'RM_Times',
+                    receiverID: 'FF5pewfsJxyrCvg8a2C8VXefeyVvKvQxmF'
+                });
+
+                logToScreen("[System] Publication Response:\n" + JSON.stringify(res, null, 2));
+                updateProgress(100, "Publication request submitted successfully!", true);
+
+                // Show Receipt Card
+                document.getElementById("receiptSummaryCard").style.display = "flex";
+                document.getElementById("receiptDetails").innerHTML = `
+                    <strong>Author FLO Address:</strong> ${myFloID}<br>
+                    <strong>Headline:</strong> "${escapeHtml(articleTitle)}"<br>
+                    <strong>Read Time:</strong> ${readTime} min
+                `;
+                document.querySelector(".auth-card").style.display = "none";
+                showToast("Article published successfully!", "success");
+
+            } catch (err) {
+                console.error("Publication failed:", err);
+                logToScreen(`[Error] ${err.message || JSON.stringify(err)}`);
+                updateProgress(100, "Publication error occurred.", false, true);
+                showCustomModal({
+                    title: "Publication Error",
+                    message: `Failed to complete blockchain publication.<br><br>Error: <i>${escapeHtml(err.message)}</i>`
+                });
+                publishBtn.disabled = false;
+                publishBtn.textContent = "Send Publishing Request to RanchiMall Times";
+            }
+        }
+
+        // =========================================================================
+        // 9. EXPORTS & RESET WORKSPACE
+        // =========================================================================
+        function buildPreviewHtml(title, content, readTime, sourceName) {
+            const safeTitle = escapeHtml(title);
+            const subtitle = sourceName ? `Source: ${escapeHtml(sourceName)} &nbsp;|&nbsp; ` : "";
+            return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${safeTitle} - RM Times</title>
+    <style>
+        :root { --primary-color: #4d2588; --bg-color: #f8f9fa; --card-bg: #ffffff; --text-color: #212529; --meta-color: #6c757d; --border-color: #e9ecef; --radius: 8px; }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 40px 20px; background-color: var(--bg-color); color: var(--text-color); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.75; }
+        .article-card { max-width: 780px; margin: 0 auto; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); padding: 40px 48px; overflow-wrap: anywhere; word-break: break-word; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary-color); padding-bottom: 12px; margin-bottom: 24px; gap: 8px; }
+        .brand-tag { font-size: 0.9rem; font-weight: 800; color: var(--primary-color); text-transform: uppercase; letter-spacing: 0.05em; }
+        .preview-badge { background: #f1ecf9; color: var(--primary-color); font-size: 0.75rem; font-weight: 700; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; white-space: nowrap; }
+        h1 { font-size: 2.1rem; color: #1a1a1a; margin: 0 0 10px 0; line-height: 1.3; font-weight: 800; overflow-wrap: anywhere; word-break: break-word; }
+        .meta { font-size: 0.88rem; color: var(--meta-color); margin-bottom: 28px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); overflow-wrap: anywhere; word-break: break-word; }
+        h3 { color: var(--primary-color); font-size: 1.35rem; font-weight: 700; margin: 36px 0 14px 0; line-height: 1.4; overflow-wrap: anywhere; word-break: break-word; }
+        h3:first-of-type { margin-top: 10px; }
+        p { margin: 0 0 18px 0; font-size: 1.05rem; color: #2b2b2b; line-height: 1.8; overflow-wrap: anywhere; word-break: break-word; }
+        p img { max-width: 100%; height: auto; border-radius: var(--radius); display: block; margin: 20px auto; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); }
+        @media (max-width: 600px) { .article-card { padding: 24px 20px; } h1 { font-size: 1.6rem; } h3 { font-size: 1.2rem; } p { font-size: 0.98rem; } }
+    </style>
+</head>
+<body>
+    <div class="article-card">
+        <div class="header-bar">
+            <span class="brand-tag">RanchiMall Times</span>
+            <span class="preview-badge">Live Article Preview</span>
+        </div>
+        <h1>${safeTitle}</h1>
+        <div class="meta">${subtitle}${readTime} min read &nbsp;|&nbsp; RM Times Direct Publisher</div>
+        ${content}
+    </div>
+</body>
+</html>`;
+        }
+
+        function triggerDownload(filename, content, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        document.getElementById("downloadJsonBtn").addEventListener("click", () => {
+            if (!loadedArticle) return;
+            const json = JSON.stringify(loadedArticle, null, 2);
+            triggerDownload(`${docxStemForDownload}.json`, json, "application/json");
+        });
+
+        document.getElementById("downloadPreviewBtn").addEventListener("click", () => {
+            if (!loadedArticle) return;
+            const html = buildPreviewHtml(loadedArticle.title, loadedArticle.content, loadedArticle.readTime, docxStemForDownload);
+            triggerDownload(`${docxStemForDownload}_preview.html`, html, "text/html");
+        });
+
+        async function openPreviewInNewTab() {
+            if (!loadedArticle) {
+                showToast("Please upload and confirm an article first.", "error");
+                return;
+            }
+
+            let heroImageHtml = "";
+            if (heroImageBlobData && heroImageBlobData.dataUrl) {
+                heroImageHtml = `<div style="margin-bottom: 28px; text-align: center;"><img src="${heroImageBlobData.dataUrl}" alt="Hero Image" style="width: 100%; max-height: 420px; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);"></div>`;
+            }
+
+            const previewHtml = buildPreviewHtml(
+                loadedArticle.title,
+                heroImageHtml + loadedArticle.content,
+                loadedArticle.readTime,
+                docxStemForDownload
+            );
+
+            const blob = new Blob([previewHtml], { type: "text/html;charset=utf-8" });
+            const blobUrl = URL.createObjectURL(blob);
+            const previewWin = window.open(blobUrl, "_blank");
+            if (!previewWin) {
+                showToast("Please allow popups to view preview in a new tab.", "warning");
+            }
+        }
+
+        function resetPublisherStudio() {
+            loadedArticle = null;
+            pendingImages = [];
+            pendingParse = null;
+            heroImageBlobData = null;
+            docxStemForDownload = "article";
+
+            document.getElementById("articleFileInput").value = "";
+            document.getElementById("heroImageFileInput").value = "";
+            document.getElementById("floPrivateKeyInput").value = "";
+            document.getElementById("contributorsInput").value = "";
+            document.getElementById("reviewTitleInput").value = "";
+            document.getElementById("pasteTitleInput").value = "";
+            document.getElementById("rawTextInput").value = "";
+            document.getElementById("structureList").innerHTML = "";
+            document.getElementById("heroBannerPreview").innerHTML = '<span style="font-size: 0.82rem; color: var(--text-muted);">📷 Click to select 16:9 Hero Image</span>';
+            document.getElementById("heroStatsRow").style.display = "none";
+            document.getElementById("heroImageStatusBadge").textContent = "None selected";
+            document.getElementById("heroImageStatusBadge").style.color = "var(--text-muted)";
+            document.getElementById("derivedFloAddressBadge").style.display = "none";
+            document.getElementById("receiptSummaryCard").style.display = "none";
+            document.getElementById("publishProgressContainer").style.display = "none";
+            document.querySelector(".auth-card").style.display = "flex";
+            document.getElementById("headerPreviewBtn").style.display = "none";
+
+            const publishBtn = document.getElementById("publishSubmitBtn");
+            publishBtn.disabled = false;
+            publishBtn.textContent = "Send Publishing Request to RanchiMall Times";
+
+            selectPublisherRole("user");
+            setInputMode("upload");
+            goToStep(1);
+            showToast("Workspace reset for new article.", "info");
+        }
+    </script>
+</body>
+</html>
